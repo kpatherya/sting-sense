@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "<>",
+      "name": "sting-sense",
+      "directory": "root",
+      "orgId": "<>"
+    }
+  ]
+}

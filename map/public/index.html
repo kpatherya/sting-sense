@@ -1,0 +1,3004 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bus Route Driving Behavior Analysis</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100vw; }
+        .leaflet-control-layers {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            position: absolute !important;
+            top: 20px !important;
+            right: 10px !important;
+            z-index: 1000;
+            min-width: 180px;
+        }
+        .leaflet-control-layers-base label, .leaflet-control-layers-overlays label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .leaflet-control-layers span[style*="background-color"] {
+            margin-right: 10px;
+        }
+        /* Enhanced popup styling */
+        .leaflet-popup-content {
+            margin: 8px 12px;
+            line-height: 1.4;
+            font-size: 13px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+        }
+        .popup-section {
+            margin-bottom: 12px;
+        }
+        .popup-header {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 6px;
+            padding-bottom: 3px;
+            border-bottom: 1px solid #ddd;
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+        }
+        .data-label {
+            font-weight: 500;
+            color: #555;
+        }
+        .data-value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+        }
+        .highlight-value {
+            background-color: #f0f8ff;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .behavior-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        }
+        /* Query interface styles */
+        .query-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background-color: rgba(25, 57, 90, 0.92);
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+            max-width: 760px;
+            width: calc(100% - 40px);
+        }
+        .query-container input {
+            flex: 1 1 260px;
+            min-width: 200px;
+            padding: 9px 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            background: rgba(255,255,255,0.95);
+            color: #1a2a3a;
+        }
+        .query-container button {
+            padding: 9px 18px;
+            background-color: #1f7acb;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .query-container button:hover {
+            background-color: #1660a0;
+            transform: translateY(-1px);
+        }
+        .mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e6f0ff;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .mode-toggle-label {
+            font-weight: 600;
+            letter-spacing: 0.2px;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0;
+            padding: 3px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.35);
+            background: rgba(12, 34, 54, 0.55);
+            cursor: pointer;
+            min-width: 120px;
+            transition: background 0.3s ease;
+        }
+        .toggle-switch:focus-visible {
+            outline: 2px solid rgba(255,255,255,0.8);
+            outline-offset: 3px;
+        }
+        .toggle-switch-option {
+            flex: 1;
+            text-align: center;
+            font-weight: 600;
+            font-size: 11px;
+            position: relative;
+            z-index: 2;
+            color: rgba(255,255,255,0.7);
+            transition: color 0.3s ease;
+            padding: 5px 8px;
+            min-width: 0;
+        }
+        .toggle-switch-option[data-role="cluster"] {
+            padding-left: 2px;
+        }
+        .toggle-switch-option[data-role="raw"] {
+            padding-right: 15px;
+        }
+        .toggle-switch-indicator {
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            left: 3px;
+            width: calc(50% - 3px);
+            border-radius: 999px;
+            background: #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: left 0.3s ease;
+            z-index: 1;
+        }
+        .toggle-switch[data-mode="raw"] .toggle-switch-indicator {
+            left: calc(50%);
+        }
+        .toggle-switch[data-mode="cluster"] .toggle-switch-option[data-role="cluster"],
+        .toggle-switch[data-mode="raw"] .toggle-switch-option[data-role="raw"] {
+            color: #0d2c4a;
+            font-weight: 700;
+        }
+        .summary-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1001;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .summary-content {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+            line-height: 1.6;
+            color: #333;
+        }
+        .summary-header {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c7bb6;
+            border-bottom: 2px solid #2c7bb6;
+            padding-bottom: 10px;
+        }
+        .summary-section {
+            margin-bottom: 20px;
+        }
+        .summary-section h3 {
+            color: #555;
+            margin-bottom: 10px;
+        }
+        .loading-message {
+            color: #1a5f8c;
+            font-weight: 600;
+        }
+        .error-message {
+            color: #d7191c;
+            background-color: #fbeaea;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .results {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .response-content {
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .feedback {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 13px;
+            color: #555;
+        }
+        .feedback-btn {
+            padding: 6px 12px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .feedback-btn:hover {
+            background-color: #f0f0f0;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+        }
+        .close-button:hover {
+            color: #333;
+        }
+        @media (max-width: 640px) {
+            .query-container {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .mode-toggle {
+                justify-content: space-between;
+                width: 100%;
+            }
+            .toggle-switch {
+                width: 100%;
+            }
+            .query-container input,
+            .query-container button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div class="query-container">
+    <div class="mode-toggle">
+        <span class="mode-toggle-label">Context</span>
+        <button type="button" id="context-toggle" class="toggle-switch" data-mode="cluster" aria-pressed="false" aria-label="Context mode: Cluster">
+            <span class="toggle-switch-indicator"></span>
+            <span class="toggle-switch-option" data-role="cluster">Cluster</span>
+            <span class="toggle-switch-option" data-role="raw">Raw</span>
+        </button>
+        <input type="hidden" id="context-mode" value="cluster" />
+    </div>
+    <input type="text" id="user-query" placeholder="Ask about driver patterns, dwell times, etc." aria-label="Enter analysis question" />
+    <button id="submit-query">Ask</button>
+</div>
+<div class="modal-overlay" id="modalOverlay"></div>
+<div class="summary-modal" id="summaryModal">
+    <button class="close-button" onclick="closeSummary()">&times;</button>
+    <div class="summary-content" id="summaryContent">
+        <div class="summary-header" id="summaryHeader">Route Analysis Summary</div>
+        <div id="summaryText">Enter a query to begin your analysis.</div>
+        <div id="feedbackContainer"></div>
+    </div>
+</div>
+
+<script>
+    var map = L.map('map').setView([33.776, -84.389], 15);
+    var allData = []; // Store all data points for analysis
+
+    // Cache derived analytics used by cluster-mode summaries.
+    const derivedSummaryCache = {
+        datasetKey: null,
+        sortedData: null,
+        timeRange: null,
+        behaviorDistribution: null,
+        aggressiveHotspots: null,
+        dwellTopK: null,
+        routeEfficiency: null
+    };
+
+    function buildDatasetKey(features) {
+        if (!features || features.length === 0) {
+            return 'empty';
+        }
+        const first = features[0]?.properties?.timestamp || 'none';
+        const last = features[features.length - 1]?.properties?.timestamp || 'none';
+        return `${features.length}:${first}:${last}`;
+    }
+
+    function resetDerivedSummaryCache(reason = 'unknown') {
+        derivedSummaryCache.datasetKey = null;
+        derivedSummaryCache.sortedData = null;
+        derivedSummaryCache.timeRange = null;
+        derivedSummaryCache.behaviorDistribution = null;
+        derivedSummaryCache.aggressiveHotspots = null;
+        derivedSummaryCache.dwellTopK = null;
+        derivedSummaryCache.routeEfficiency = null;
+        console.log(`♻️ Derived summary cache reset (${reason})`);
+    }
+
+    function ensureDerivedSummaryCacheCurrent() {
+        const currentKey = buildDatasetKey(allData);
+        if (derivedSummaryCache.datasetKey !== currentKey) {
+            resetDerivedSummaryCache('dataset-changed');
+            derivedSummaryCache.datasetKey = currentKey;
+        }
+    }
+
+    const promptTemplates = {
+    aggressivePatterns: `You are a transportation safety analyst. Given the following summary of aggressive driving evidence, explain the underlying patterns in plain language, cite the campus locations, and recommend one follow-up analysis. Reply in plain text with no markdown, bullets, headings, or special characters, and keep it under 180 words.\n\nDATA SUMMARY:\n{{data}}\n\nUSER QUESTION: {{userQuery}}`,
+    raw: `You are a transportation analyst. You will receive the entire bus telemetry dataset as raw JSON without any preprocessing. Use it to answer the user's question directly, pointing to concrete observations. Respond in plain text only—do not use markdown formatting, bullet points, or special characters—and keep your reply under 200 words.\n\nRAW DATASET (JSON):\n{{data}}\n\nUSER QUESTION: {{userQuery}}`,
+    rawChunk: `You are a transportation analyst reviewing bus telemetry part {{chunkIndex}} of {{totalChunks}}. The data is raw JSON with no preprocessing. Extract concrete observations (locations, timestamps, behaviors) relevant to the user question. Write in plain text with no markdown, lists, or special characters, keep your response under 120 words, note any potential safety concerns, and focus only on this chunk.\n\nRAW DATA CHUNK:\n{{data}}\n\nUSER QUESTION: {{userQuery}}`,
+    rawFinal: `You previously reviewed {{chunkCount}} raw telemetry chunks. Combine the analyst notes below into one cohesive answer for the user. Reference the question directly, call out specific patterns or anomalies, and keep the response under 220 words. Produce plain text only—no markdown formatting, bullets, or special characters. {{truncatedNote}}\n\nANALYST NOTES:\n{{data}}\n\nUSER QUESTION: {{userQuery}}`,
+    dwellTime: `You are an operations planner studying bus dwell times. Interpret the campus dwell indicators below, connect them to possible rider or traffic causes, and outline one actionable optimization. Reference the places mentioned. Answer in plain text with no markdown, bullet points, or headings, and limit to 180 words.\n\nDATA SUMMARY:\n{{data}}\n\nUSER QUESTION: {{userQuery}}`,
+    routeEfficiency: `You are a route efficiency specialist. Review the distance and timing insights below, assess how efficiently the bus moved through campus, and highlight any detours or slow legs in under 180 words. Use plain text only—no markdown formatting, lists, or special symbols.\n\nDATA SUMMARY:\n{{data}}\n\nUSER QUESTION: {{userQuery}}`,
+    generalInfo: `You are writing a narrative briefing for campus transportation leadership. Summarize the key takeaways from the data below and directly address the user question in 180 words or less. Respond in plain text with no markdown, lists, or special characters.\n\nDATA SUMMARY:\n{{data}}\n\nUSER QUESTION: {{userQuery}}`
+    };
+
+    const RAW_SINGLE_REQUEST_CHAR_LIMIT = 11000;
+    const RAW_MAX_CHUNKS = 50;
+    const TOKENS_PER_CHAR_ESTIMATE = 0.25;       // More accurate estimate (1 token ~ 4 chars)
+    const MAX_INPUT_TOKENS = 3000;               // Reduced from 4000 to create lighter, safer chunks
+    const SYNTHESIS_CONTEXT_LIMIT = 120000;      // Set a safe limit for the final prompt (e.g., ~90% of 131k)
+
+    // ============================================================================
+    // BENCHMARK INSTRUCTIONS - RUN THESE COMMANDS IN YOUR BROWSER CONSOLE
+    // ============================================================================
+    //
+    // TO RUN 5-ITERATION BENCHMARK FOR PUBLICATION-QUALITY STATISTICS:
+    //
+    //   1. Open this page in your browser
+    //   2. Wait for the map data to load completely
+    //   3. Open Developer Console (F12 or Cmd+Option+I on Mac)
+    //   4. Run: runBenchmark(5)
+    //
+    // WHAT HAPPENS:
+    //   - Tests 5 representative questions in both cluster and raw modes
+    //   - Runs each question 5 times to calculate mean ± standard deviation
+    //   - Measures: latency, token usage, cost for each run
+    //   - Raw mode uses random sampling (5 chunks) for stochastic responses
+    //   - Estimated time: ~2.5-3 hours for full 5-run benchmark (60s rate limits)
+    //
+    // OUTPUT FILES:
+    //   - benchmark_aggregated_YYYY-MM-DD.csv (mean ± stdDev for each question)
+    //   - benchmark_raw_runs_YYYY-MM-DD.csv (individual run data)
+    //   - Results also saved to localStorage and console
+    //
+    // OPTIONAL COMMANDS:
+    //   - runBenchmark(1)  : Quick test (1 run per question, ~30-40 min total)
+    //   - runBenchmark(3)  : Standard test (3 runs per question, ~1.5-2 hours total)
+    //   - checkDataCoverage() : Check if raw mode processes full dataset
+    //   - estimateRawModeCalls() : Estimate time for raw mode query
+    //
+    // ============================================================================
+
+    // ============================================================================
+    // RATE LIMITING CONFIGURATION
+    // Model: llama-3.1-8b-instant has 30 RPM, 6K TPM limits
+    // TPM is the bottleneck: Testing shows 429 errors even with 30s spacing
+    // Conservative settings: 60s spacing ensures we stay well under limits
+    // These settings apply to both live webpage queries and benchmark runs.
+    // ============================================================================
+    const RATE_LIMIT_CONFIG = {
+        // Delay between chunk processing (milliseconds)
+        // Increased to 60 seconds to avoid TPM (Tokens Per Minute) limit violations
+        CHUNK_DELAY_MS: 60000,
+        
+        // Delay before final synthesis call (milliseconds)
+        // Must be at least as long as CHUNK_DELAY_MS for consistency
+        FINAL_DELAY_MS: 60000,
+        
+        // Maximum number of retry attempts when rate limited
+        // More retries = more resilient, but slower on failure
+        MAX_RETRIES: 3,
+        
+        // Base delay for exponential backoff on retries (milliseconds)
+        // Starts at 30 seconds to be safe
+        RETRY_BASE_DELAY_MS: 30000,
+        
+        // Maximum chunks to process in raw mode
+        // Limited to 5 chunks with random sampling for stochastic responses
+        // Trade-off: Faster processing, but not full dataset coverage
+        MAX_CHUNKS: 5,
+        
+        // Minimum delay enforced between ANY consecutive API calls (milliseconds)
+        // Increased to 60 seconds to match chunk delay
+        MIN_REQUEST_SPACING_MS: 60000
+    };
+
+    // Track last API call time for rate limiting
+    let lastAPICallTime = 0;
+
+    // Reset rate limit tracking (useful between benchmark modes or after errors)
+    function resetRateLimitTimer() {
+        lastAPICallTime = 0;
+        console.log('🔄 Rate limit timer reset');
+    }
+
+    async function enforceRateLimit() {
+        const now = Date.now();
+        const timeSinceLastCall = now - lastAPICallTime;
+        const minSpacing = RATE_LIMIT_CONFIG.MIN_REQUEST_SPACING_MS;
+        
+        if (timeSinceLastCall < minSpacing) {
+            const waitTime = minSpacing - timeSinceLastCall;
+            console.log(`⏳ Enforcing minimum ${minSpacing}ms spacing between API calls (waiting ${waitTime}ms)...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+        
+        lastAPICallTime = Date.now();
+    }
+
+    function splitFeaturesForRaw(features, charLimit = RAW_SINGLE_REQUEST_CHAR_LIMIT, maxChunks = RAW_MAX_CHUNKS) {
+        const result = [];
+        let current = [];
+        let currentLength = 2; // account for [] brackets
+        let startIndex = 0;
+        let index = 0;
+        let truncated = false;
+
+        while (index < features.length) {
+            const feature = features[index];
+            const serialized = JSON.stringify(feature);
+            const addedLength = serialized.length + (current.length ? 1 : 0);
+
+            if (addedLength > charLimit && current.length === 0) {
+                current.push(feature);
+                result.push({ features: current, startIndex: index, endIndex: index, charLength: serialized.length + 2 });
+                index += 1;
+                current = [];
+                currentLength = 2;
+                if (result.length >= maxChunks) {
+                    truncated = index < features.length;
+                    break;
+                }
+                continue;
+            }
+
+            if (currentLength + addedLength > charLimit && current.length > 0) {
+                result.push({ features: current, startIndex, endIndex: index - 1, charLength: currentLength });
+                if (result.length >= maxChunks) {
+                    truncated = index < features.length;
+                    current = [];
+                    break;
+                }
+                current = [];
+                currentLength = 2;
+                startIndex = index;
+                continue;
+            }
+
+            if (current.length === 0) {
+                startIndex = index;
+            }
+
+            current.push(feature);
+            currentLength += addedLength;
+            index += 1;
+        }
+
+        if (current.length && result.length < maxChunks) {
+            result.push({ features: current, startIndex, endIndex: index - 1, charLength: currentLength });
+        } else if (current.length) {
+            truncated = true;
+        }
+
+        const processedCount = result.length ? result[result.length - 1].endIndex + 1 : 0;
+        return { chunks: result, truncated, processedCount };
+    }
+
+    function analyzeUserQuery(query) {
+        const normalized = query.toLowerCase();
+        const queryTypes = {
+            aggressivePatterns: ['aggressive', 'dangerous', 'speeding', 'harsh', 'reckless', 'behavior', 'pattern'],
+            dwellTime: ['dwell', 'stop', 'wait', 'idle', 'stationary', 'linger', 'pause'],
+            routeEfficiency: ['route', 'path', 'efficiency', 'detour', 'time', 'distance', 'slow', 'fast'],
+            generalInfo: ['summary', 'overview', 'information', 'stats', 'insight', 'analysis']
+        };
+
+        const scores = Object.entries(queryTypes).map(([category, keywords]) => {
+            const score = keywords.reduce((total, keyword) => total + (normalized.includes(keyword) ? 1 : 0), 0);
+            return { category, score };
+        });
+
+        scores.sort((a, b) => b.score - a.score);
+        return scores[0].score > 0 ? scores[0] : { category: 'generalInfo', score: 0 };
+    }
+
+    function getSelectedContextMode() {
+        const modeField = document.getElementById('context-mode');
+        return modeField ? modeField.value : 'cluster';
+    }
+
+    function escapeHtml(text) {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function optimizeFeatureForRawMode(feature) {
+        // extract only the properties we need, rename for brevity
+        const props = feature.properties;
+        const [lon, lat] = feature.geometry.coordinates;
+
+        return {
+            b: props.behavior,
+            t: props.timestamp,
+            c: [lat, lon],
+            i: props.instability_score,
+            cl: props.cluster,
+            a: {
+                m: props.accel_mean,
+                x99: props.accel_stats_x_p99,
+                y99: props.accel_stats_y_p99,
+                z99: props.accel_stats_z_p99
+            }
+        };
+    }
+
+    function compressDataset(features) {
+        // including a legend for property names, helping the model understand
+        const legend = {
+            b: "behavior",
+            t: "timestamp",
+            c: "coordinates [lat, lon]",
+            i: "instability_score",
+            cl: "cluster",
+            a: {
+                m: "accel_mean",
+                x99: "accel_stats_x_p99",
+                y99: "accel_stats_y_p99",
+                z99: "accel_stats_z_p99"
+            }
+        };
+
+        // map the features to an optimized format
+        const optimizedFeatures = features.map(optimizeFeatureForRawMode);
+
+        return { legend, data: optimizedFeatures };
+    }
+
+    function splitFeaturesForRawMode(features) {
+        // Step 1: Optimize/compress the entire dataset
+        const compressedData = compressDataset(features);
+        
+        // Step 2: Calculate total estimated tokens
+        const dataString = JSON.stringify(compressedData);
+        const estimatedTokens = dataString.length * TOKENS_PER_CHAR_ESTIMATE;
+        
+        // Step 3: If it fits in one request, don't split at all
+        if (estimatedTokens <= MAX_INPUT_TOKENS) {
+            return {
+                chunks: [{
+                    data: compressedData,
+                    startIndex: 0,
+                    endIndex: features.length - 1,
+                    estimatedTokens
+                }],
+                truncated: false,
+                processedCount: features.length
+            };
+        }
+        
+        // Step 4: Calculate legend overhead (it's included in every chunk)
+        const sampleChunk = compressDataset([features[0]]);
+        const legendOverhead = JSON.stringify({ legend: sampleChunk.legend }).length * TOKENS_PER_CHAR_ESTIMATE;
+        
+        // Step 5: Calculate tokens available for actual data (after accounting for legend + JSON structure)
+        const availableTokensPerChunk = MAX_INPUT_TOKENS - legendOverhead - 100; // 100 token safety margin
+        
+        // Step 6: Estimate tokens per feature (from the data array only, not legend)
+        const dataOnlyTokens = JSON.stringify(compressedData.data).length * TOKENS_PER_CHAR_ESTIMATE;
+        const tokensPerFeature = dataOnlyTokens / features.length;
+        
+        // Step 7: Calculate features per chunk with safety margin (use 60% of available space)
+        const featuresPerChunk = Math.max(1, Math.floor((availableTokensPerChunk * 0.6) / tokensPerFeature));
+        
+        console.log(`📐 Chunking calculation:`);
+        console.log(`   Legend overhead: ~${Math.round(legendOverhead)} tokens`);
+        console.log(`   Tokens per feature: ~${tokensPerFeature.toFixed(1)} tokens`);
+        console.log(`   Features per chunk: ${featuresPerChunk}`);
+        console.log(`   Target chunk size: ~${Math.round(availableTokensPerChunk * 0.8)} tokens`);
+        console.log(`   Max chunks limit: ${RATE_LIMIT_CONFIG.MAX_CHUNKS}`);
+        
+        // Step 8: RANDOM SAMPLING APPROACH
+        // Instead of sequential chunks, randomly sample from the dataset
+        // This provides stochastic responses and better coverage with fewer API calls
+        
+        const maxChunks = RATE_LIMIT_CONFIG.MAX_CHUNKS;
+        const totalPossibleChunks = Math.ceil(features.length / featuresPerChunk);
+        const chunksToCreate = Math.min(maxChunks, totalPossibleChunks);
+        
+        console.log(`🎲 Random sampling strategy:`);
+        console.log(`   Total possible chunks: ${totalPossibleChunks}`);
+        console.log(`   Chunks to create: ${chunksToCreate}`);
+        console.log(`   Sampling approach: ${chunksToCreate < totalPossibleChunks ? 'RANDOM' : 'FULL'}`);
+        
+        const result = [];
+        const sampledIndices = new Set();
+        
+        if (chunksToCreate >= totalPossibleChunks) {
+            // If we can fit all data in max chunks, use sequential approach
+            let startIndex = 0;
+            while (startIndex < features.length && result.length < maxChunks) {
+                const endIndex = Math.min(startIndex + featuresPerChunk - 1, features.length - 1);
+                const chunkFeatures = features.slice(startIndex, endIndex + 1);
+                const chunkData = compressDataset(chunkFeatures);
+                const chunkString = JSON.stringify(chunkData);
+                const chunkTokens = chunkString.length * TOKENS_PER_CHAR_ESTIMATE;
+                
+                result.push({
+                    data: chunkData,
+                    startIndex,
+                    endIndex,
+                    estimatedTokens: chunkTokens
+                });
+                
+                startIndex = endIndex + 1;
+            }
+        } else {
+            // Random sampling: select chunks evenly distributed across the dataset
+            const chunkStride = Math.floor(totalPossibleChunks / chunksToCreate);
+            
+            for (let i = 0; i < chunksToCreate; i++) {
+                // Calculate which chunk to sample (evenly distributed)
+                const chunkNumber = Math.floor(i * chunkStride + Math.random() * chunkStride);
+                const startIndex = chunkNumber * featuresPerChunk;
+                const endIndex = Math.min(startIndex + featuresPerChunk - 1, features.length - 1);
+                
+                if (startIndex >= features.length) break;
+                
+                const chunkFeatures = features.slice(startIndex, endIndex + 1);
+                const chunkData = compressDataset(chunkFeatures);
+                const chunkString = JSON.stringify(chunkData);
+                const chunkTokens = chunkString.length * TOKENS_PER_CHAR_ESTIMATE;
+                
+                result.push({
+                    data: chunkData,
+                    startIndex,
+                    endIndex,
+                    estimatedTokens: chunkTokens,
+                    isRandomSample: true
+                });
+                
+                console.log(`   📍 Sampled chunk ${i + 1}: records ${startIndex + 1}-${endIndex + 1}`);
+            }
+        }
+        
+        // Calculate actual number of records processed
+        // For random sampling, sum up records in each chunk
+        // For sequential, it's the endIndex of last chunk + 1
+        const processedCount = result.reduce((sum, chunk) => sum + (chunk.endIndex - chunk.startIndex + 1), 0);
+        const truncated = processedCount < features.length || chunksToCreate < totalPossibleChunks;
+        
+        return {
+            chunks: result,
+            truncated: truncated,
+            processedCount: processedCount,
+            isRandomSample: chunksToCreate < totalPossibleChunks,
+            totalRecords: features.length
+        };
+    }
+
+    function getTimeRangeSummary() {
+        if (!allData.length) {
+            return null;
+        }
+        const sorted = [...allData].sort((a, b) => new Date(a.properties.timestamp) - new Date(b.properties.timestamp));
+        const start = new Date(sorted[0].properties.timestamp);
+        const end = new Date(sorted[sorted.length - 1].properties.timestamp);
+        const durationMinutes = Math.round((end - start) / 60000);
+        return {
+            startISO: start.toISOString(),
+            endISO: end.toISOString(),
+            durationMinutes
+        };
+    }
+
+    function getBehaviorDistribution() {
+        return allData.reduce((acc, feature) => {
+            const behavior = feature.properties.behavior || 'Unknown';
+            acc[behavior] = (acc[behavior] || 0) + 1;
+            return acc;
+        }, {});
+    }
+
+    function computeAggressiveHotspots() {
+        const aggressiveEvents = allData.filter(feature => ['Aggressive', 'Very Aggressive'].includes(feature.properties.behavior));
+        const clusters = aggressiveEvents.reduce((acc, feature) => {
+            const clusterId = feature.properties.cluster ?? 'unclustered';
+            if (!acc[clusterId]) {
+                acc[clusterId] = {
+                    points: [],
+                    instability: 0
+                };
+            }
+            acc[clusterId].points.push(feature);
+            acc[clusterId].instability += feature.properties.instability_score || 0;
+            return acc;
+        }, {});
+
+        return Object.entries(clusters).map(([clusterId, data]) => {
+            const representative = data.points[0];
+            const [lon, lat] = representative.geometry.coordinates;
+            const locationContext = getEnhancedLocationContext(lat, lon);
+            return {
+                clusterId,
+                events: data.points.length,
+                averageInstability: Number((data.instability / data.points.length).toFixed(3)),
+                location: locationContext.description,
+                behaviorBreakdown: data.points.reduce((acc, feature) => {
+                    const behavior = feature.properties.behavior;
+                    acc[behavior] = (acc[behavior] || 0) + 1;
+                    return acc;
+                }, {})
+            };
+        }).sort((a, b) => (b.averageInstability * b.events) - (a.averageInstability * a.events)).slice(0, 5);
+    }
+
+    function computeDwellIndicators(sortedData) {
+        const dwellIndicators = [];
+        for (let i = 1; i < sortedData.length; i++) {
+            const current = sortedData[i];
+            const previous = sortedData[i - 1];
+            const currentTime = new Date(current.properties.timestamp);
+            const previousTime = new Date(previous.properties.timestamp);
+            const gapMs = currentTime - previousTime;
+            if (gapMs >= 120000) { // 2 minutes or more
+                const [prevLon, prevLat] = previous.geometry.coordinates;
+                const context = getEnhancedLocationContext(prevLat, prevLon);
+                dwellIndicators.push({
+                    durationMinutes: Number((gapMs / 60000).toFixed(1)),
+                    resumedBehavior: current.properties.behavior,
+                    location: context.description,
+                    timestamp: previous.properties.timestamp
+                });
+            }
+        }
+        return dwellIndicators.slice(0, 5);
+    }
+
+    function computeRouteEfficiency(sortedData) {
+        if (sortedData.length < 2) {
+            return null;
+        }
+        let traveledDistance = 0;
+        for (let i = 1; i < sortedData.length; i++) {
+            const [prevLon, prevLat] = sortedData[i - 1].geometry.coordinates;
+            const [lon, lat] = sortedData[i].geometry.coordinates;
+            traveledDistance += getDistance(prevLat, prevLon, lat, lon);
+        }
+        const [startLon, startLat] = sortedData[0].geometry.coordinates;
+        const [endLon, endLat] = sortedData[sortedData.length - 1].geometry.coordinates;
+        const straightLine = getDistance(startLat, startLon, endLat, endLon);
+        const efficiencyRatio = straightLine === 0 ? 1 : straightLine / traveledDistance;
+        return {
+            traveledDistanceMetres: Math.round(traveledDistance),
+            straightLineMetres: Math.round(straightLine),
+            efficiencyRatio: Number(efficiencyRatio.toFixed(3)),
+            startLocation: getEnhancedLocationContext(startLat, startLon).description,
+            endLocation: getEnhancedLocationContext(endLat, endLon).description
+        };
+    }
+
+    async function fetchRelevantData(category) {
+        if (!allData.length) {
+            return { status: 'empty', message: 'No route data is loaded yet.' };
+        }
+
+        ensureDerivedSummaryCacheCurrent();
+
+        if (!derivedSummaryCache.sortedData) {
+            derivedSummaryCache.sortedData = [...allData].sort((a, b) => new Date(a.properties.timestamp) - new Date(b.properties.timestamp));
+        }
+        if (!derivedSummaryCache.timeRange) {
+            derivedSummaryCache.timeRange = getTimeRangeSummary();
+        }
+        if (!derivedSummaryCache.behaviorDistribution) {
+            derivedSummaryCache.behaviorDistribution = getBehaviorDistribution();
+        }
+
+        const base = {
+            totalEvents: allData.length,
+            timeRange: derivedSummaryCache.timeRange,
+            behaviorDistribution: derivedSummaryCache.behaviorDistribution
+        };
+
+        switch (category) {
+            case 'aggressivePatterns':
+                if (!derivedSummaryCache.aggressiveHotspots) {
+                    derivedSummaryCache.aggressiveHotspots = computeAggressiveHotspots();
+                }
+                return {
+                    base,
+                    aggressiveHotspots: derivedSummaryCache.aggressiveHotspots
+                };
+            case 'dwellTime':
+                if (!derivedSummaryCache.dwellTopK) {
+                    derivedSummaryCache.dwellTopK = computeDwellIndicators(derivedSummaryCache.sortedData);
+                }
+                return {
+                    base,
+                    dwellIndicators: derivedSummaryCache.dwellTopK
+                };
+            case 'routeEfficiency':
+                if (!derivedSummaryCache.routeEfficiency) {
+                    derivedSummaryCache.routeEfficiency = computeRouteEfficiency(derivedSummaryCache.sortedData);
+                }
+                return {
+                    base,
+                    routeEfficiency: derivedSummaryCache.routeEfficiency
+                };
+            default:
+                return { base };
+        }
+    }
+
+    function formatSummaryForPrompt(category, summary) {
+        if (summary.status === 'empty') {
+            return 'No bus route data is currently loaded on the map.';
+        }
+
+        const lines = [];
+        const { base } = summary;
+        if (base) {
+            lines.push(`Total events recorded: ${base.totalEvents}`);
+            if (base.timeRange) {
+                lines.push(`Observation window: ${base.timeRange.startISO} to ${base.timeRange.endISO} (${base.timeRange.durationMinutes} minutes).`);
+            }
+            lines.push('Behavior distribution: ' + Object.entries(base.behaviorDistribution).map(([behavior, count]) => `${behavior}=${count}`).join(', '));
+        }
+
+        if (category === 'aggressivePatterns' && summary.aggressiveHotspots?.length) {
+            lines.push('Aggressive hotspots:');
+            summary.aggressiveHotspots.forEach((hotspot, index) => {
+                lines.push(`${index + 1}. Cluster ${hotspot.clusterId} at ${hotspot.location} (${hotspot.events} events, average instability ${hotspot.averageInstability}).`);
+            });
+        }
+
+        if (category === 'dwellTime') {
+            if (summary.dwellIndicators?.length) {
+                lines.push('Potential dwell periods:');
+                summary.dwellIndicators.forEach((entry, index) => {
+                    lines.push(`${index + 1}. ${entry.durationMinutes} mins near ${entry.location} before ${entry.timestamp}, resumed as ${entry.resumedBehavior}.`);
+                });
+            } else {
+                lines.push('No extended pauses (>2 minutes) detected between recorded points.');
+            }
+        }
+
+        if (category === 'routeEfficiency' && summary.routeEfficiency) {
+            const r = summary.routeEfficiency;
+            lines.push(`Route distance travelled: ${r.traveledDistanceMetres} m.`);
+            lines.push(`Straight-line distance start to end: ${r.straightLineMetres} m.`);
+            lines.push(`Efficiency ratio (straight/travelled): ${r.efficiencyRatio}.`);
+            lines.push(`Start: ${r.startLocation}. End: ${r.endLocation}.`);
+        }
+
+        return lines.join('\n');
+    }
+
+    function buildPrompt(category, query, dataSummary, extraReplacements = {}) {
+        const template = promptTemplates[category] || promptTemplates.generalInfo;
+        const replacements = { data: dataSummary, userQuery: query, ...extraReplacements };
+        return template.replace(/{{(.*?)}}/g, (_, key) => {
+            const token = key.trim();
+            return Object.prototype.hasOwnProperty.call(replacements, token) ? replacements[token] : '';
+        });
+    }
+
+    async function callLLMAPI(prompt, retries = RATE_LIMIT_CONFIG.MAX_RETRIES, delayMs = RATE_LIMIT_CONFIG.RETRY_BASE_DELAY_MS) {
+        // Enforce minimum spacing between API calls
+        await enforceRateLimit();
+        
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const response = await fetch('/api/generate-summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+
+                if (response.status === 429) {
+                    // Rate limit hit
+                    const retryAfter = response.headers.get('Retry-After');
+                    const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : delayMs * attempt;
+                    
+                    if (attempt < retries) {
+                        console.warn(`⚠️ Rate limit hit (429). Retrying in ${waitTime/1000}s... (Attempt ${attempt}/${retries})`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        continue;
+                    } else {
+                        throw new Error(`Rate limit exceeded. Please wait a moment and try again. The API allows a limited number of requests per minute.`);
+                    }
+                }
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API error (${response.status}): ${errorText || 'Unable to retrieve analysis from the language model.'}`);
+                }
+
+                const data = await response.json();
+                const message = data?.choices?.[0]?.message?.content;
+                if (!message) {
+                    throw new Error('Received an empty response from the language model.');
+                }
+                
+                // Extract actual token usage from API response
+                const usage = data?.usage || null;
+                
+                return {
+                    message: message.trim(),
+                    usage: usage ? {
+                        promptTokens: usage.prompt_tokens || 0,
+                        completionTokens: usage.completion_tokens || 0,
+                        totalTokens: usage.total_tokens || 0
+                    } : null
+                };
+            } catch (error) {
+                if (attempt === retries) {
+                    throw error;
+                }
+                // For network errors, retry with exponential backoff
+                if (!error.message.includes('Rate limit')) {
+                    console.warn(`⚠️ API call failed: ${error.message}. Retrying... (Attempt ${attempt}/${retries})`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+                }
+            }
+        }
+    }
+
+    async function processRawMode(query) {
+        if (!allData.length) {
+            throw new Error('No route data has been loaded yet. Zoom or reload the map to fetch telemetry.');
+        }
+
+        // Helper to estimate tokens more accurately
+        const estimateTokens = (text) => Math.ceil((text || '').length / 4);
+
+        // Ensure minimum spacing from any previous API calls (e.g., cluster mode benchmark)
+        await enforceRateLimit();
+        
+        // Track actual token usage across all API calls
+        let totalPromptTokens = 0;
+        let totalCompletionTokens = 0;
+
+        const jsonDataset = JSON.stringify(allData, null, 2);
+        if (jsonDataset.length <= RAW_SINGLE_REQUEST_CHAR_LIMIT) {
+            const prompt = buildPrompt('raw', query, jsonDataset);
+            const apiResponse = await callLLMAPI(prompt);
+            
+            if (apiResponse.usage) {
+                totalPromptTokens = apiResponse.usage.promptTokens;
+                totalCompletionTokens = apiResponse.usage.completionTokens;
+            }
+            
+            return {
+                response: apiResponse.message,
+                category: 'raw-single',
+                dataSummary: `Full dataset (${allData.length} records, ${jsonDataset.length} chars) sent to model.\n\n${jsonDataset}`,
+                actualTokens: {
+                    promptTokens: totalPromptTokens,
+                    completionTokens: totalCompletionTokens,
+                    totalTokens: totalPromptTokens + totalCompletionTokens
+                }
+            };
+        }
+
+        // Kausar (oct 21): switched from splitFeaturesForRaw to splitFeaturesForRawMode
+        // potentially processing 5-10× more records in the same token space.
+        
+
+        const { chunks, truncated, processedCount, isRandomSample, totalRecords } = splitFeaturesForRawMode(allData);
+        if (!chunks.length) {
+            throw new Error('Unable to prepare the dataset for raw analysis. Try switching to cluster mode.');
+        }
+
+        // Log data coverage information
+        console.log(`📊 Dataset Analysis Coverage:`);
+        console.log(`   Total records: ${allData.length}`);
+        console.log(`   Sampling strategy: ${isRandomSample ? 'RANDOM SAMPLING' : 'SEQUENTIAL'}`);
+        console.log(`   Chunks: ${chunks.length} (max allowed: ${RATE_LIMIT_CONFIG.MAX_CHUNKS})`);
+        
+        if (isRandomSample) {
+            console.warn(`🎲 RANDOM SAMPLING ACTIVE:`);
+            console.warn(`   Using ${chunks.length} randomly sampled chunks from dataset`);
+            console.warn(`   This provides stochastic responses with faster processing`);
+            console.warn(`   Coverage is distributed across the full dataset time range`);
+        } else if (truncated) {
+            const skipped = allData.length - processedCount;
+            console.warn(`⚠️  DATA TRUNCATION WARNING:`);
+            console.warn(`   ${skipped} records (${((skipped / allData.length) * 100).toFixed(1)}%) will NOT be analyzed`);
+            console.warn(`   Increase MAX_CHUNKS for more coverage (current: ${RATE_LIMIT_CONFIG.MAX_CHUNKS})`);
+        } else {
+            console.log(`✅ Full dataset will be analyzed`);
+        }
+        console.log('');
+
+        const chunkNotes = [];
+        const chunkDescriptors = [];
+        let cumulativeNotesTokens = 0;
+        let synthesisForced = false;
+        
+        // Track pure API latency (excluding artificial delays)
+        let pureApiLatencyMs = 0;
+
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const chunkJson = JSON.stringify(chunk.data, null, 2);
+            
+            // Calculate and log chunk size for debugging
+            const estimatedChunkTokens = estimateTokens(chunkJson);
+            chunkDescriptors.push(`Chunk ${i + 1}: records ${chunk.startIndex + 1}-${chunk.endIndex + 1} (${chunkJson.length} chars, ~${estimatedChunkTokens} tokens)`);
+            
+            // Warn if chunk might exceed token limit
+            if (estimatedChunkTokens > MAX_INPUT_TOKENS) {
+                console.warn(`⚠️ WARNING: Chunk ${i + 1} may exceed token limit (${estimatedChunkTokens} > ${MAX_INPUT_TOKENS})`);
+            }
+
+            // Add delay between chunks to avoid rate limiting (except for first chunk)
+            if (i > 0) {
+                const delaySeconds = RATE_LIMIT_CONFIG.CHUNK_DELAY_MS / 1000;
+                console.log(`⏳ Waiting ${delaySeconds}s before processing chunk ${i + 1} to avoid rate limits...`);
+                await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_CONFIG.CHUNK_DELAY_MS));
+            }
+
+            console.log(`📊 Processing chunk ${i + 1}/${chunks.length} (~${estimatedChunkTokens} tokens)...`);
+            
+            // Measure pure API call time (excluding delays)
+            const chunkStartTime = performance.now();
+            const apiResponse = await callLLMAPI(
+                buildPrompt('rawChunk', query, chunkJson, {
+                    chunkIndex: i + 1,
+                    totalChunks: chunks.length
+                })
+            );
+            const chunkEndTime = performance.now();
+            const chunkLatency = chunkEndTime - chunkStartTime;
+            pureApiLatencyMs += chunkLatency;
+
+            // Track actual token usage from API
+            if (apiResponse.usage) {
+                totalPromptTokens += apiResponse.usage.promptTokens;
+                totalCompletionTokens += apiResponse.usage.completionTokens;
+                console.log(`   📊 Tokens: ${apiResponse.usage.promptTokens} prompt + ${apiResponse.usage.completionTokens} completion = ${apiResponse.usage.totalTokens} total`);
+                console.log(`   ⚡ API latency: ${(chunkLatency / 1000).toFixed(2)}s`);
+            }
+
+            const note = `Chunk ${i + 1} findings:\n${apiResponse.message}`;
+            const noteTokens = estimateTokens(note);
+            
+            // Log response preview for debugging
+            const preview = apiResponse.message.substring(0, 100).replace(/\n/g, ' ');
+            console.log(`   ✓ Chunk ${i + 1} response: "${preview}${apiResponse.message.length > 100 ? '...' : ''}"`);
+            
+            // Check if adding this note exceeds our synthesis budget
+            if (cumulativeNotesTokens + noteTokens > SYNTHESIS_CONTEXT_LIMIT) {
+                console.warn(`🚨 CONTEXT LIMIT REACHED!`);
+                console.warn(`   Cumulative notes: ${cumulativeNotesTokens} tokens.`);
+                console.warn(`   Next note would add ${noteTokens} tokens, exceeding the ${SYNTHESIS_CONTEXT_LIMIT} token budget.`);
+                console.warn(`   Moving to final synthesis with ${chunkNotes.length} notes. Skipping remaining ${chunks.length - i} chunks.`);
+                synthesisForced = true;
+                break; // Exit the loop to proceed to synthesis
+            }
+
+            chunkNotes.push(note);
+            cumulativeNotesTokens += noteTokens;
+            console.log(`   Added note (${noteTokens} tokens). Cumulative notes tokens: ${cumulativeNotesTokens}`);
+        }
+
+        const finalTruncated = truncated || synthesisForced;
+        let truncatedNote;
+        if (synthesisForced) {
+            const lastChunk = chunks[chunkNotes.length - 1];
+            const recordsAnalyzed = lastChunk.endIndex + 1;
+            truncatedNote = `Analysis was stopped after ${chunkNotes.length} chunks to avoid exceeding the model's context window. The first ${recordsAnalyzed} of ${allData.length} records were processed.`;
+        } else if (isRandomSample) {
+            truncatedNote = `Analysis used ${chunkNotes.length} randomly sampled chunks from ${allData.length} total records. This stochastic sampling approach provides diverse coverage across the dataset while respecting rate limits.`;
+        } else {
+            truncatedNote = finalTruncated
+                ? `Only the first ${processedCount} of ${allData.length} records could be processed due to chunk limits.`
+                : `All ${processedCount} records were processed across ${chunks.length} chunk(s).`;
+        }
+
+        // Add delay before final synthesis to avoid rate limiting
+        const finalDelaySeconds = RATE_LIMIT_CONFIG.FINAL_DELAY_MS / 1000;
+        console.log(`⏳ Waiting ${finalDelaySeconds}s before final synthesis...`);
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_CONFIG.FINAL_DELAY_MS));
+
+        console.log(`🔄 Synthesizing final response from ${chunkNotes.length} chunk(s)...`);
+        const finalPrompt = buildPrompt('rawFinal', query, chunkNotes.join('\n\n'), {
+            chunkCount: chunkNotes.length,
+            truncatedNote
+        });
+
+        console.log(`   Final prompt token estimate: ${estimateTokens(finalPrompt)}`);
+        
+        // Measure final synthesis API call time
+        const finalStartTime = performance.now();
+        const finalApiResponse = await callLLMAPI(finalPrompt);
+        const finalEndTime = performance.now();
+        const finalLatency = finalEndTime - finalStartTime;
+        pureApiLatencyMs += finalLatency;
+        
+        // Track final synthesis tokens
+        if (finalApiResponse.usage) {
+            totalPromptTokens += finalApiResponse.usage.promptTokens;
+            totalCompletionTokens += finalApiResponse.usage.completionTokens;
+            console.log(`   📊 Tokens: ${finalApiResponse.usage.promptTokens} prompt + ${finalApiResponse.usage.completionTokens} completion = ${finalApiResponse.usage.totalTokens} total`);
+            console.log(`   ⚡ API latency: ${(finalLatency / 1000).toFixed(2)}s`);
+        }
+        
+        // Log final response preview
+        const finalPreview = finalApiResponse.message.substring(0, 150).replace(/\n/g, ' ');
+        console.log(`   ✅ Final synthesis: "${finalPreview}${finalApiResponse.message.length > 150 ? '...' : ''}"`);
+        
+        // Log cumulative token usage and pure API latency for entire raw mode query
+        const totalTokens = totalPromptTokens + totalCompletionTokens;
+        console.log(`\n   📊 TOTAL RAW MODE TOKENS: ${totalPromptTokens.toLocaleString()} prompt + ${totalCompletionTokens.toLocaleString()} completion = ${totalTokens.toLocaleString()} total`);
+        console.log(`   ⚡ PURE API LATENCY (excluding delays): ${(pureApiLatencyMs / 1000).toFixed(2)}s\n`);
+
+    const partialNotes = chunkNotes.join('\n\n');
+    const dataSummary = `${chunkDescriptors.join('\n')}
+${finalTruncated ? `⚠️ ${truncatedNote}` : truncatedNote}
+
+Partial chunk notes forwarded to the final prompt:
+${partialNotes}`;
+    return { 
+        response: finalApiResponse.message, 
+        category: finalTruncated ? 'raw-chunked-partial' : 'raw-chunked', 
+        dataSummary,
+        actualTokens: {
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
+            totalTokens: totalTokens
+        },
+        pureApiLatencyMs: pureApiLatencyMs  // Pure API time excluding artificial delays
+    };
+    }
+
+    async function processUserQuery(query, mode = 'cluster') {
+        if (mode === 'raw') {
+            return processRawMode(query);
+        }
+
+        const { category } = analyzeUserQuery(query);
+        const summary = await fetchRelevantData(category);
+        const dataSummary = formatSummaryForPrompt(category, summary);
+        const prompt = buildPrompt(category, query, dataSummary);
+        const apiResponse = await callLLMAPI(prompt);
+        
+        // Extract actual token usage
+        let actualTokens = null;
+        if (apiResponse.usage) {
+            actualTokens = {
+                promptTokens: apiResponse.usage.promptTokens,
+                completionTokens: apiResponse.usage.completionTokens,
+                totalTokens: apiResponse.usage.totalTokens
+            };
+            console.log(`   📊 Tokens: ${apiResponse.usage.promptTokens} prompt + ${apiResponse.usage.completionTokens} completion = ${apiResponse.usage.totalTokens} total`);
+        }
+        
+        // Log cluster mode response preview
+        const preview = apiResponse.message.substring(0, 120).replace(/\n/g, ' ');
+        console.log(`   ✅ Cluster response: "${preview}${apiResponse.message.length > 120 ? '...' : ''}"`);
+        
+        return { 
+            response: apiResponse.message, 
+            category, 
+            dataSummary,
+            actualTokens
+        };
+    }
+
+    function renderLoadingState(query, mode) {
+        showSummaryModal();
+        const modeLabel = mode === 'raw' ? 'Raw' : 'Cluster';
+        document.getElementById('summaryHeader').textContent = `Analyzing (${modeLabel} mode): "${query}"`;
+    const modeMessage = mode === 'raw' ? 'the full raw dataset (chunking if necessary)…' : 'clustered insights';
+    document.getElementById('summaryText').innerHTML = `<p class="loading-message">Processing your question with ${modeMessage}</p>`;
+        document.getElementById('feedbackContainer').innerHTML = '';
+    }
+
+    function displayResults(query, mode, result) {
+        const summaryHeader = document.getElementById('summaryHeader');
+        const summaryText = document.getElementById('summaryText');
+        const feedbackContainer = document.getElementById('feedbackContainer');
+
+        const modeLabel = mode === 'raw' ? 'Raw' : 'Cluster';
+        summaryHeader.textContent = `Result (${modeLabel} mode) for: "${query}"`;
+        const dataSummaryLabel = mode === 'raw' ? 'Raw dataset delivery summary' : 'Data summary provided to the model';
+        summaryText.innerHTML = `
+            <div class="results">
+                <div class="response-content">${escapeHtml(result.response)}</div>
+                <details>
+                    <summary>${escapeHtml(dataSummaryLabel)}</summary>
+                    <pre style="white-space: pre-wrap; font-size: 12px; background: #f7f7f7; padding: 10px; border-radius: 6px;">${escapeHtml(result.dataSummary)}</pre>
+                </details>
+            </div>
+        `;
+
+        feedbackContainer.innerHTML = `
+            <div class="feedback">
+                <span>Was this response helpful?</span>
+                <button class="feedback-btn" data-value="yes">Yes</button>
+                <button class="feedback-btn" data-value="no">No</button>
+            </div>
+        `;
+
+        feedbackContainer.querySelectorAll('.feedback-btn').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const value = event.target.getAttribute('data-value');
+                logFeedback(query, result.response, value, mode);
+                feedbackContainer.innerHTML = '<div class="feedback">Thanks for the feedback!</div>';
+            });
+        });
+    }
+
+    function handleQueryError(query, mode, error) {
+        const summaryHeader = document.getElementById('summaryHeader');
+        const summaryText = document.getElementById('summaryText');
+        const feedbackContainer = document.getElementById('feedbackContainer');
+
+        const modeLabel = mode === 'raw' ? 'Raw' : 'Cluster';
+        summaryHeader.textContent = `Issue while analyzing (${modeLabel} mode): "${query}"`;
+        summaryText.innerHTML = `<div class="error-message">${escapeHtml(error.message || 'Something went wrong.')}</div>`;
+        feedbackContainer.innerHTML = '';
+    }
+
+    function logFeedback(query, response, feedback, mode) {
+        console.info('User feedback captured', { query, mode, feedback, responseSnippet: response.slice(0, 120) });
+    }
+
+    function attachQueryHandlers() {
+        const input = document.getElementById('user-query');
+        const button = document.getElementById('submit-query');
+        const toggleButton = document.getElementById('context-toggle');
+        const modeField = document.getElementById('context-mode');
+
+        if (!input || !button) {
+            return;
+        }
+
+        const applyModeToToggle = (mode) => {
+            if (!toggleButton || !modeField) {
+                return;
+            }
+            modeField.value = mode;
+            toggleButton.dataset.mode = mode;
+            toggleButton.setAttribute('aria-pressed', mode === 'raw');
+            toggleButton.setAttribute('aria-label', `Context mode: ${mode === 'raw' ? 'Raw' : 'Cluster'}`);
+        };
+
+        if (toggleButton && modeField) {
+            applyModeToToggle(modeField.value || 'cluster');
+            toggleButton.addEventListener('click', () => {
+                const nextMode = modeField.value === 'cluster' ? 'raw' : 'cluster';
+                applyModeToToggle(nextMode);
+            });
+        }
+
+        button.addEventListener('click', async () => {
+            const query = input.value.trim();
+            if (!query) {
+                input.focus();
+                return;
+            }
+            const mode = getSelectedContextMode();
+            renderLoadingState(query, mode);
+            try {
+                const result = await processUserQuery(query, mode);
+                displayResults(query, mode, result);
+            } catch (error) {
+                console.error('Error processing query:', error);
+                handleQueryError(query, mode, error);
+            }
+        });
+
+        input.addEventListener('keydown', async (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                button.click();
+            }
+        });
+    }
+
+    var baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // --- Updated Data Configuration for Behavior-Based Clustering ---
+    const behaviorTypes = ['Calm', 'Moderate', 'Slightly Unstable', 'Aggressive', 'Very Aggressive'];
+    const behaviorColors = {
+        'Calm': '#2c7bb6',
+        'Moderate': '#abd9e9', 
+        'Slightly Unstable': '#ffffbf',
+        'Aggressive': '#fdae61',
+        'Very Aggressive': '#d7191c'
+    };
+
+    // Create an object to hold our layer groups, one for each behavior type
+    const overlayLayers = {};
+    
+    // Create a Layer Group for each behavior type and add it to the map by default
+    behaviorTypes.forEach(behavior => {
+        const color = behaviorColors[behavior];
+        const layerName = `<span style="background-color:${color}; padding: 1px 8px; border-radius: 3px;">&nbsp;</span> ${behavior}`;
+        
+        // Create an empty layer group for this behavior
+        overlayLayers[layerName] = L.layerGroup().addTo(map);
+    });
+
+    // --- Data Loading and Processing ---
+    fetch('bus_route_with_clusters.geojson')
+        .then(response => response.json())
+        .then(data => {
+            // Store all data points for analysis
+            allData = data.features;
+            resetDerivedSummaryCache('geojson-loaded');
+
+            // Warm the core stats used by the three demo query types.
+            ensureDerivedSummaryCacheCurrent();
+            derivedSummaryCache.sortedData = [...allData].sort((a, b) => new Date(a.properties.timestamp) - new Date(b.properties.timestamp));
+            derivedSummaryCache.timeRange = getTimeRangeSummary();
+            derivedSummaryCache.behaviorDistribution = getBehaviorDistribution();
+            derivedSummaryCache.aggressiveHotspots = computeAggressiveHotspots();
+            derivedSummaryCache.dwellTopK = computeDwellIndicators(derivedSummaryCache.sortedData);
+
+            // Process each feature and add it to the correct layer group
+            data.features.forEach((feature, index) => {
+                const props = feature.properties;
+                const behavior = props.behavior;
+                const color = props.color;
+                
+                const marker = L.circleMarker(
+                    [feature.geometry.coordinates[1], feature.geometry.coordinates[0]],
+                    {
+                        radius: 6,
+                        fillColor: color,
+                        color: "#000",
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }
+                );
+
+                // Build comprehensive popup content
+                const popupContent = `
+                    <div style="width: 320px; max-height: 400px; overflow-y: auto;">
+                        <!-- Header Section -->
+                        <div class="popup-section">
+                            <div style="text-align: center; margin-bottom: 10px;">
+                                <span class="behavior-badge" style="background-color: ${color};">${behavior} Driving</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Timestamp:</span>
+                                <span class="data-value">${props.timestamp}</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Location:</span>
+                                <span class="data-value">${feature.geometry.coordinates[1].toFixed(6)}, ${feature.geometry.coordinates[0].toFixed(6)}</span>
+                            </div>
+                        </div>
+
+                        <!-- Clustering Analysis Section -->
+                        <div class="popup-section">
+                            <div class="popup-header">🎯 Clustering Analysis</div>
+                            <div class="data-row">
+                                <span class="data-label">Cluster ID:</span>
+                                <span class="data-value highlight-value">${props.cluster}</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Extreme Event Magnitude:</span>
+                                <span class="data-value highlight-value">${props.extreme_event_magnitude.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Instability Score:</span>
+                                <span class="data-value highlight-value">${props.instability_score.toFixed(4)} (m/s²)²</span>
+                            </div>
+                        </div>
+
+                        <!-- Basic Acceleration Statistics -->
+                        <div class="popup-section">
+                            <div class="popup-header">📊 Basic Acceleration Statistics</div>
+                            <div class="data-row">
+                                <span class="data-label">Mean Acceleration:</span>
+                                <span class="data-value">${props.accel_mean.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">Acceleration Variance:</span>
+                                <span class="data-value">${props.accel_variance.toFixed(4)} (m/s²)²</span>
+                            </div>
+                        </div>
+
+                        <!-- X-Axis Acceleration Statistics -->
+                        <div class="popup-section">
+                            <div class="popup-header">📈 X-Axis Acceleration Percentiles</div>
+                            <div class="data-row">
+                                <span class="data-label">1st Percentile (p1):</span>
+                                <span class="data-value">${props.accel_stats_x_p1.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">10th Percentile (p10):</span>
+                                <span class="data-value">${props.accel_stats_x_p10.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">90th Percentile (p90):</span>
+                                <span class="data-value">${props.accel_stats_y_p90.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">99th Percentile (p99):</span>
+                                <span class="data-value highlight-value">${props.accel_stats_x_p99.toFixed(4)} m/s²</span>
+                            </div>
+                        </div>
+
+                        <!-- Y-Axis Acceleration Statistics -->
+                        <div class="popup-section">
+                            <div class="popup-header">📈 Y-Axis Acceleration Percentiles</div>
+                            <div class="data-row">
+                                <span class="data-label">1st Percentile (p1):</span>
+                                <span class="data-value">${props.accel_stats_y_p1.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">10th Percentile (p10):</span>
+                                <span class="data-value">${props.accel_stats_y_p10.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">90th Percentile (p90):</span>
+                                <span class="data-value">${props.accel_stats_y_p90.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">99th Percentile (p99):</span>
+                                <span class="data-value highlight-value">${props.accel_stats_y_p99.toFixed(4)} m/s²</span>
+                            </div>
+                        </div>
+
+                        <!-- Z-Axis Acceleration Statistics -->
+                        <div class="popup-section">
+                            <div class="popup-header">📈 Z-Axis Acceleration Percentiles</div>
+                            <div class="data-row">
+                                <span class="data-label">1st Percentile (p1):</span>
+                                <span class="data-value">${props.accel_stats_z_p1.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">10th Percentile (p10):</span>
+                                <span class="data-value">${props.accel_stats_z_p10.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">90th Percentile (p90):</span>
+                                <span class="data-value">${props.accel_stats_z_p90.toFixed(4)} m/s²</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">99th Percentile (p99):</span>
+                                <span class="data-value highlight-value">${props.accel_stats_z_p99.toFixed(4)} m/s²</span>
+                            </div>
+                        </div>
+
+                        <!-- AI Insight Section -->
+                        <div class="popup-section">
+                            <div class="popup-header">🤖 AI Insight</div>
+                            <div id="ai-insight-${index}" style="font-size: 12px; color: #333; line-height: 1.4; min-height: 40px; padding: 5px; background-color: #f7f7f7; border-radius: 3px;">
+                                Click the button for an AI-powered explanation.
+                            </div>
+                            <button id="ai-insight-btn-${index}" onclick='getAiInsight(${index})' style="margin-top: 10px; padding: 6px 12px; background-color: #2c7bb6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Get AI Insight</button>
+                        </div>
+
+                        <!-- Interpretation Section -->
+                        <div class="popup-section">
+                            <div class="popup-header">🔍 Data Interpretation</div>
+                            <div style="font-size: 11px; color: #666; line-height: 1.3;">
+                                <strong>Extreme Event Magnitude:</strong> Combined 3D acceleration vector magnitude from 99th percentiles - higher values indicate more severe acceleration events.<br><br>
+                                <strong>Instability Score:</strong> Acceleration variance - higher values indicate more erratic or jerky motion.<br><br>
+                                <strong>Percentiles:</strong> p1/p10 show typical low values, p90/p99 show extreme high values for each axis.
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                marker.bindPopup(popupContent, {
+                    maxWidth: 350,
+                    maxHeight: 450
+                });
+                
+                // Find the correct layer group by behavior name and add the marker
+                const layerKey = Object.keys(overlayLayers).find(key => key.includes(behavior));
+                if (layerKey) {
+                    overlayLayers[layerKey].addLayer(marker);
+                }
+            });
+
+            // Fit map to the bounds of all features
+            const allPointsLayer = L.geoJSON(data);
+            if (allPointsLayer.getBounds().isValid()) {
+                map.fitBounds(allPointsLayer.getBounds());
+            }
+        })
+        .catch(error => {
+            console.error('Error loading GeoJSON:', error);
+            alert('Error loading bus data. Please check that your GeoJSON file is accessible.');
+        });
+
+    // Add the layer control panel to the map
+    L.control.layers(null, overlayLayers, { collapsed: false }).addTo(map);
+
+    // --- Enhanced Geographic Landmark System ---
+    const campusLandmarks = {
+        buildings: [
+            { name: 'Klaus Advanced Computing Building', center: [33.777, -84.396], radius: 30, type: 'academic' },
+            { name: 'Student Center', center: [33.774, -84.3915], radius: 50, type: 'dining' },
+            { name: 'CRC (Campus Recreation Center)', center: [33.776, -84.404], radius: 40, type: 'recreation' },
+            { name: 'Clough Undergraduate Learning Commons', center: [33.775, -84.3965], radius: 35, type: 'academic' },
+            { name: 'Guggenheim Building', center: [33.7755, -84.394], radius: 25, type: 'academic' },
+            { name: 'Bobby Dodd Stadium', center: [33.773, -84.395], radius: 60, type: 'athletics' },
+            { name: 'North Avenue Apartments', center: [33.772, -84.392], radius: 45, type: 'residential' },
+            { name: 'Tech Tower', center: [33.775, -84.396], radius: 20, type: 'administrative' },
+            { name: 'Library', center: [33.775, -84.3965], radius: 30, type: 'academic' },
+            { name: 'Campus Center', center: [33.774, -84.3915], radius: 40, type: 'dining' },
+            { name: 'Howey Physics Building', center: [33.776, -84.395], radius: 25, type: 'academic' },
+            { name: 'Van Leer Electrical Engineering Building', center: [33.776, -84.395], radius: 30, type: 'academic' },
+            { name: 'College of Computing Building', center: [33.777, -84.396], radius: 25, type: 'academic' },
+            { name: 'Skiles Classroom Building', center: [33.775, -84.395], radius: 25, type: 'academic' },
+            { name: 'Ferst Center for the Arts', center: [33.774, -84.393], radius: 30, type: 'arts' }
+        ],
+        intersections: [
+            { name: 'Ferst Dr & Atlantic Dr', center: [33.779, -84.397], radius: 25, type: 'traffic' },
+            { name: 'North Ave & Techwood Dr', center: [33.771, -84.392], radius: 30, type: 'traffic' },
+            { name: 'Ferst Dr & State St', center: [33.775, -84.394], radius: 20, type: 'traffic' },
+            { name: 'Ferst Dr & Cherry St', center: [33.773, -84.394], radius: 20, type: 'traffic' },
+            { name: '10th St & Hemphill Ave', center: [33.777, -84.389], radius: 25, type: 'traffic' },
+            { name: '5th St & Spring St', center: [33.780, -84.385], radius: 25, type: 'traffic' }
+        ],
+        zones: [
+            { name: 'Tech Square District', center: [33.777, -84.389], radius: 150, type: 'commercial' },
+            { name: 'West Campus Housing', center: [33.778, -84.401], radius: 200, type: 'residential' },
+            { name: 'East Campus', center: [33.776, -84.385], radius: 180, type: 'academic' },
+            { name: 'Midtown Area', center: [33.780, -84.385], radius: 120, type: 'commercial' },
+            { name: 'Tech Green', center: [33.776, -84.395], radius: 80, type: 'recreation' },
+            { name: 'Historic District', center: [33.775, -84.396], radius: 100, type: 'historic' }
+        ],
+        transportation: [
+            { name: 'Tech Trolley Stop - Student Center', center: [33.774, -84.391], radius: 15, type: 'transit' },
+            { name: 'MARTA North Avenue Station', center: [33.771, -84.387], radius: 100, type: 'transit' },
+            { name: 'Tech Trolley Stop - Tech Square', center: [33.777, -84.389], radius: 15, type: 'transit' },
+            { name: 'Tech Trolley Stop - CRC', center: [33.776, -84.404], radius: 15, type: 'transit' },
+            { name: 'Bike Share Station - Student Center', center: [33.774, -84.3915], radius: 10, type: 'bikeshare' },
+            { name: 'Bike Share Station - Tech Square', center: [33.777, -84.389], radius: 10, type: 'bikeshare' }
+        ],
+        crosswalks: [
+            { name: 'Clough Commons Crosswalk', center: [33.775, -84.3965], radius: 15, type: 'pedestrian' },
+            { name: 'Student Center Crosswalk', center: [33.774, -84.3915], radius: 15, type: 'pedestrian' },
+            { name: 'Tech Square Crosswalk', center: [33.777, -84.389], radius: 15, type: 'pedestrian' },
+            { name: 'Bobby Dodd Crosswalk', center: [33.773, -84.395], radius: 15, type: 'pedestrian' }
+        ],
+        construction: [
+            { name: 'Construction Zone - West Campus', center: [33.778, -84.401], radius: 50, type: 'construction' },
+            { name: 'Construction Zone - Tech Square', center: [33.777, -84.389], radius: 40, type: 'construction' }
+        ]
+    };
+
+    // --- Helper function to calculate distance between two lat-lon points ---
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; // Earth's radius in metres
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lon2-lon1) * Math.PI/180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+        return R * c; // Distance in metres
+    }
+
+    // --- Enhanced Location Context Function ---
+    function getEnhancedLocationContext(lat, lon) {
+        const contexts = [];
+        
+        // Check all landmark types in order of specificity
+        ['buildings', 'crosswalks', 'intersections', 'transportation', 'construction', 'zones'].forEach(category => {
+            campusLandmarks[category].forEach(landmark => {
+                const distance = getDistance(lat, lon, landmark.center[0], landmark.center[1]);
+                if (distance <= landmark.radius) {
+                    contexts.push({
+                        name: landmark.name,
+                        distance: Math.round(distance),
+                        type: landmark.type,
+                        category: category
+                    });
+                }
+            });
+        });
+        
+        // Return most specific context available
+        if (contexts.length > 0) {
+            contexts.sort((a, b) => a.distance - b.distance);
+            const primary = contexts[0];
+            let contextString = `near ${primary.name}`;
+            
+            // Add secondary context if relevant and close
+            if (contexts.length > 1 && contexts[1].distance < 50) {
+                contextString += `, close to ${contexts[1].name}`;
+            }
+            
+            // Add construction context if present
+            const constructionContext = contexts.find(c => c.type === 'construction');
+            if (constructionContext) {
+                contextString += ` (construction zone nearby)`;
+            }
+            
+            return {
+                description: contextString,
+                primary: primary,
+                secondary: contexts.length > 1 ? contexts[1] : null,
+                construction: constructionContext,
+                all: contexts
+            };
+        }
+        
+        return {
+            description: 'in an unidentified campus area',
+            primary: null,
+            secondary: null,
+            construction: null,
+            all: []
+        };
+    }
+
+    // --- Temporal Context Enhancement ---
+    function getTemporalContext(timestamp) {
+        const date = new Date(timestamp);
+        const hour = date.getHours();
+        const dayOfWeek = date.getDay();
+        const month = date.getMonth();
+        
+        let timeContext = '';
+        let trafficContext = '';
+        let pedestrianContext = '';
+        
+        // Time of day context
+        if (hour >= 7 && hour <= 9) {
+            timeContext = 'during morning rush hour';
+            trafficContext = 'heavy commuter traffic';
+            pedestrianContext = 'students heading to early classes';
+        } else if (hour >= 11 && hour <= 13) {
+            timeContext = 'during lunch hours';
+            trafficContext = 'moderate traffic with food delivery vehicles';
+            pedestrianContext = 'high pedestrian activity for lunch';
+        } else if (hour >= 16 && hour <= 18) {
+            timeContext = 'during evening rush hour';
+            trafficContext = 'heavy commuter traffic';
+            pedestrianContext = 'students leaving campus';
+        } else if (hour >= 19 && hour <= 23) {
+            timeContext = 'during evening hours';
+            trafficContext = 'light traffic';
+            pedestrianContext = 'students returning from evening activities';
+        } else if (hour >= 0 && hour <= 6) {
+            timeContext = 'during late night/early morning';
+            trafficContext = 'minimal traffic';
+            pedestrianContext = 'very few pedestrians';
+        } else {
+            timeContext = 'during off-peak hours';
+            trafficContext = 'moderate traffic';
+            pedestrianContext = 'normal pedestrian activity';
+        }
+        
+        // Day context
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+            timeContext += ' on a weekday';
+        } else {
+            timeContext += ' on a weekend';
+        }
+        
+        // Academic calendar context (simplified)
+        if (month >= 8 || month <= 5) {
+            timeContext += ' during academic year';
+        } else {
+            timeContext += ' during summer break';
+        }
+        
+        return {
+            timeDescription: timeContext,
+            trafficLevel: trafficContext,
+            pedestrianActivity: pedestrianContext,
+            hour: hour,
+            dayOfWeek: dayOfWeek,
+            isWeekday: dayOfWeek >= 1 && dayOfWeek <= 5,
+            isRushHour: (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18)
+        };
+    }
+
+    // --- Validation and Grounding System ---
+    function validateInsight(insight, eventData, locationContext) {
+        const validationRules = {
+            // Check if response mentions location correctly
+            locationMention: locationContext.primary ? locationContext.primary.name.toLowerCase() : 'campus',
+            
+            // Validate behavior classification consistency
+            behaviorConsistency: eventData.behavior.toLowerCase(),
+            
+            // Check for hallucinated landmarks
+            knownLandmarks: Object.values(campusLandmarks).flat().map(b => b.name.toLowerCase()),
+            
+            // Check for reasonable length
+            maxLength: 100,
+            minLength: 20
+        };
+        
+        const issues = [];
+        const insightLower = insight.toLowerCase();
+        
+        // Length validation
+        if (insight.length > validationRules.maxLength) {
+            issues.push('Response is too long');
+        }
+        if (insight.length < validationRules.minLength) {
+            issues.push('Response is too short');
+        }
+        
+        // Location validation
+        if (locationContext.primary && !insightLower.includes(validationRules.locationMention)) {
+            issues.push('Response does not reference the correct location');
+        }
+        
+        // Behavior consistency
+        if (!insightLower.includes(validationRules.behaviorConsistency)) {
+            issues.push('Response does not align with classified behavior');
+        }
+        
+        // Check for hallucinated landmarks
+        const mentionedLandmarks = insightLower.match(/\b[a-z\s]+(?:building|center|station|stop|crosswalk|intersection)\b/g) || [];
+        const unknownLandmarks = mentionedLandmarks.filter(landmark => 
+            !validationRules.knownLandmarks.some(known => known.includes(landmark.trim()))
+        );
+        
+        if (unknownLandmarks.length > 0) {
+            issues.push(`Mentions unknown landmarks: ${unknownLandmarks.join(', ')}`);
+        }
+        
+        // Content quality checks
+        if (insightLower.includes('i apologize') || insightLower.includes('i cannot')) {
+            issues.push('Response contains apology or refusal language');
+        }
+        
+        if (insightLower.includes('as an ai') || insightLower.includes('language model')) {
+            issues.push('Response contains AI self-reference');
+        }
+        
+        return {
+            isValid: issues.length === 0,
+            issues: issues,
+            confidence: Math.max(0, 1 - (issues.length * 0.2)),
+            score: Math.max(0, 100 - (issues.length * 20))
+        };
+    }
+
+    // --- Enhanced Neighbor Analysis ---
+    function getEnhancedNeighborAnalysis(lat, lon, radius = 100) {
+        const neighbors = allData.filter((otherFeature, i) => {
+            const [otherLon, otherLat] = otherFeature.geometry.coordinates;
+            return getDistance(lat, lon, otherLat, otherLon) <= radius;
+        });
+
+        if (neighbors.length === 0) {
+            return {
+                count: 0,
+                summary: 'No other events detected nearby.',
+                behaviorDistribution: {},
+                temporalPattern: null,
+                spatialPattern: null
+            };
+        }
+
+        // Behavior distribution
+        const behaviorCounts = neighbors.reduce((acc, curr) => {
+            const behavior = curr.properties.behavior;
+            acc[behavior] = (acc[behavior] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Temporal pattern analysis
+        const timeSlots = neighbors.map(n => {
+            const hour = new Date(n.properties.timestamp).getHours();
+            return hour >= 7 && hour <= 9 ? 'morning' : 
+                   hour >= 11 && hour <= 13 ? 'lunch' :
+                   hour >= 16 && hour <= 18 ? 'evening' : 'other';
+        });
+        const temporalPattern = timeSlots.reduce((acc, slot) => {
+            acc[slot] = (acc[slot] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Spatial pattern (distance distribution)
+        const distances = neighbors.map(n => {
+            const [otherLon, otherLat] = n.geometry.coordinates;
+            return getDistance(lat, lon, otherLat, otherLon);
+        });
+        const avgDistance = distances.reduce((a, b) => a + b, 0) / distances.length;
+
+        const summaryParts = Object.entries(behaviorCounts).map(([b, c]) => `${c} ${b}`);
+        const summary = `The immediate area (${radius}m radius) contains ${neighbors.length} other event(s): ${summaryParts.join(', ')}.`;
+
+        return {
+            count: neighbors.length,
+            summary: summary,
+            behaviorDistribution: behaviorCounts,
+            temporalPattern: temporalPattern,
+            spatialPattern: {
+                averageDistance: Math.round(avgDistance),
+                closestDistance: Math.round(Math.min(...distances)),
+                furthestDistance: Math.round(Math.max(...distances))
+            }
+        };
+    }
+
+    // --- Legacy function for backward compatibility ---
+    function getZoneName(lat, lon) {
+        const context = getEnhancedLocationContext(lat, lon);
+        return context.primary ? context.primary.name : 'an un-named area';
+    }
+
+    // --- Cross-Referencing with Known Campus Features ---
+    function getCampusFeatureContext(locationContext, temporalContext) {
+        const insights = [];
+        
+        // Cross-reference location type with temporal patterns
+        if (locationContext.primary) {
+            const locationType = locationContext.primary.type;
+            const isRushHour = temporalContext.isRushHour;
+            const isWeekday = temporalContext.isWeekday;
+            
+            // Academic buildings during class hours
+            if (locationType === 'academic' && isWeekday && temporalContext.hour >= 8 && temporalContext.hour <= 17) {
+                insights.push('High student pedestrian traffic between classes');
+            }
+            
+            // Dining areas during meal times
+            if (locationType === 'dining' && (temporalContext.hour >= 11 && temporalContext.hour <= 14 || temporalContext.hour >= 17 && temporalContext.hour <= 19)) {
+                insights.push('Food delivery vehicles and student meal traffic');
+            }
+            
+            // Transit stops during peak hours
+            if (locationType === 'transit' && isRushHour) {
+                insights.push('Bus and trolley traffic with passenger loading/unloading');
+            }
+            
+            // Construction zones
+            if (locationContext.construction) {
+                insights.push('Construction-related traffic and lane closures');
+            }
+            
+            // Crosswalks and pedestrian areas
+            if (locationType === 'pedestrian') {
+                insights.push('Pedestrian crossing activity');
+            }
+        }
+        
+        return insights.length > 0 ? insights.join('; ') : 'Normal campus traffic patterns';
+    }
+
+    // --- Enhanced Response Quality Assurance ---
+    function enhanceResponseQuality(insight, eventData, locationContext, temporalContext) {
+        let enhancedInsight = insight;
+        
+        // Add missing location context if not present
+        if (locationContext.primary && !insight.toLowerCase().includes(locationContext.primary.name.toLowerCase())) {
+            enhancedInsight = `Near ${locationContext.primary.name}: ${enhancedInsight}`;
+        }
+        
+        // Add temporal context if missing
+        if (!insight.toLowerCase().includes('morning') && !insight.toLowerCase().includes('evening') && 
+            !insight.toLowerCase().includes('lunch') && !insight.toLowerCase().includes('rush')) {
+            if (temporalContext.isRushHour) {
+                enhancedInsight = enhancedInsight.replace(/\.$/, '') + ` during ${temporalContext.timeDescription.split(' ')[1]} rush hour.`;
+            }
+        }
+        
+        // Add campus-specific context
+        const campusContext = getCampusFeatureContext(locationContext, temporalContext);
+        if (!enhancedInsight.toLowerCase().includes('student') && !enhancedInsight.toLowerCase().includes('pedestrian')) {
+            if (campusContext.includes('student') || campusContext.includes('pedestrian')) {
+                enhancedInsight = enhancedInsight.replace(/\.$/, '') + ` This is typical for ${campusContext.toLowerCase()}.`;
+            }
+        }
+        
+        return enhancedInsight;
+    }
+
+    // --- Retry Logic for Low-Quality Responses ---
+    async function retryInsightGeneration(prompt, maxRetries = 2) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch('/api/generate-insight', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: prompt + `\n\nAttempt ${attempt}: Please ensure your response is specific to the location and time mentioned.`
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to get AI insight from server.');
+                }
+
+                const data = await response.json();
+                return data.choices[0].message.content;
+                
+            } catch (error) {
+                console.error(`Attempt ${attempt} failed:`, error);
+                if (attempt === maxRetries) {
+                    throw error;
+                }
+                // Wait before retry
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    }
+
+    // Add these functions for summary generation
+    function showSummaryModal() {
+        document.getElementById('modalOverlay').style.display = 'block';
+        document.getElementById('summaryModal').style.display = 'block';
+    }
+
+    function closeSummary() {
+        document.getElementById('modalOverlay').style.display = 'none';
+        document.getElementById('summaryModal').style.display = 'none';
+    }
+
+    async function getAiInsight(index) {
+        const feature = allData[index];
+        const props = feature.properties;
+        const insightContainer = document.getElementById(`ai-insight-${index}`);
+        const insightButton = document.getElementById(`ai-insight-btn-${index}`);
+
+        if (!feature) {
+            insightContainer.innerHTML = 'Error: Data not found.';
+            return;
+        }
+
+        insightButton.disabled = true;
+        insightButton.textContent = 'Analyzing...';
+        insightContainer.innerHTML = 'Generating AI insight, please wait...';
+
+        // --- Enhanced Context Generation ---
+        const [lon, lat] = feature.geometry.coordinates;
+        const locationContext = getEnhancedLocationContext(lat, lon);
+        const temporalContext = getTemporalContext(props.timestamp);
+        const neighborAnalysis = getEnhancedNeighborAnalysis(lat, lon, 100);
+
+        // --- Enhanced, Context-Rich Prompt with Validation ---
+        const prompt = `
+            You are a transportation safety analyst providing a concise, 50-word summary for a specific driving event on the Georgia Tech campus. Your summary must be a single block of plaintext with no special formatting.
+
+            Campus Context: Georgia Tech is an active urban campus with heavy pedestrian traffic, construction zones, and multiple transportation modes (buses, cars, bikes, scooters).
+
+            Event Details:
+            - Behavior Classification: '${props.behavior}'
+            - Location: ${locationContext.description}
+            - Temporal Context: ${temporalContext.timeDescription}
+            - Traffic Level: ${temporalContext.trafficLevel}
+            - Pedestrian Activity: ${temporalContext.pedestrianActivity}
+            - Technical Metrics: Instability ${props.instability_score.toFixed(2)}, 
+              Peak accelerations X: ${props.accel_stats_x_p99.toFixed(2)} m/s², Y: ${props.accel_stats_y_p99.toFixed(2)} m/s², Z: ${props.accel_stats_z_p99.toFixed(2)} m/s²
+
+            Neighborhood Context: ${neighborAnalysis.summary}
+
+            Campus Feature Context: ${getCampusFeatureContext(locationContext, temporalContext)}
+
+            Provide a 50-word explanation that:
+            1. Describes what likely happened (e.g., "sudden braking", "sharp turn")
+            2. Explains WHY it happened given the location and time
+            3. Uses familiar campus landmarks and student behavior patterns
+            4. References the specific location mentioned above
+
+            Write in plain, everyday language that anyone can understand.
+        `;
+        try {
+            let insight;
+
+            const response = await fetch('/api/generate-insight', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to get AI insight from server.');
+            }
+
+            const data = await response.json();
+            insight = data.choices[0].message.content;
+
+            // --- Validation and Quality Assurance ---
+            const validation = validateInsight(insight, props, locationContext);
+            
+            // If validation fails and score is low, try retry logic
+            if (!validation.isValid && validation.score < 60) {
+                console.warn('Low quality response detected, attempting retry...');
+                try {
+                    insight = await retryInsightGeneration(prompt, 1);
+                    // Re-validate after retry
+                    const retryValidation = validateInsight(insight, props, locationContext);
+                    if (retryValidation.score > validation.score) {
+                        validation.score = retryValidation.score;
+                        validation.isValid = retryValidation.isValid;
+                        validation.issues = retryValidation.issues;
+                    }
+                } catch (retryError) {
+                    console.warn('Retry failed, using original response:', retryError);
+                }
+            }
+
+            // --- Response Quality Enhancement ---
+            insight = enhanceResponseQuality(insight, props, locationContext, temporalContext);
+
+            // Display insight with validation feedback if needed
+            let displayContent = insight;
+            if (!validation.isValid && validation.score < 60) {
+                displayContent = `<div style="color: #d7191c; font-size: 11px; margin-bottom: 5px;">⚠️ Low confidence response</div>${insight}`;
+            } else if (validation.score >= 80) {
+                displayContent = `<div style="color: #28a745; font-size: 11px; margin-bottom: 5px;">✓ High confidence response</div>${insight}`;
+            }
+
+            insightContainer.innerHTML = displayContent;
+            insightButton.style.display = 'none'; // Hide button after success
+
+        } catch (error) {
+            console.error('Error getting AI insight:', error);
+            insightContainer.innerHTML = 'Sorry, unable to generate an insight at this time. Please try again later.';
+            insightButton.disabled = false;
+            insightButton.textContent = 'Get AI Insight';
+        }
+    }
+
+    async function generateSummary() {
+        showSummaryModal();
+        const summaryText = document.getElementById('summaryText');
+        summaryText.innerHTML = 'Generating summary...';
+
+        try {
+            // --- Enhanced: Client-side aggregation with temporal and spatial analysis ---
+            const clusters = allData.reduce((acc, feature) => {
+                const clusterId = feature.properties.cluster;
+                if (!acc[clusterId]) {
+                    acc[clusterId] = { 
+                        points: [], 
+                        behaviors: {}, 
+                        instability: 0,
+                        timestamps: [],
+                        locations: []
+                    };
+                }
+                acc[clusterId].points.push(feature);
+                acc[clusterId].timestamps.push(feature.properties.timestamp);
+                acc[clusterId].locations.push(feature.geometry.coordinates);
+                
+                const behavior = feature.properties.behavior;
+                acc[clusterId].behaviors[behavior] = (acc[clusterId].behaviors[behavior] || 0) + 1;
+                acc[clusterId].instability += feature.properties.instability_score;
+                return acc;
+            }, {});
+
+            const clusterAnalysis = Object.entries(clusters).map(([id, data]) => {
+                const totalPoints = data.points.length;
+                const avgInstability = data.instability / totalPoints;
+                const dominantBehavior = Object.keys(data.behaviors).reduce((a, b) => data.behaviors[a] > data.behaviors[b] ? a : b);
+                const aggressiveCount = (data.behaviors['Aggressive'] || 0) + (data.behaviors['Very Aggressive'] || 0);
+                
+                // Enhanced severity score: combination of aggressive acts, instability, and temporal clustering
+                const severity = aggressiveCount * avgInstability; 
+                const [lon, lat] = data.points[0].geometry.coordinates;
+                
+                // Temporal analysis
+                const timeSlots = data.timestamps.map(ts => {
+                    const hour = new Date(ts).getHours();
+                    return hour >= 7 && hour <= 9 ? 'morning' : 
+                           hour >= 11 && hour <= 13 ? 'lunch' :
+                           hour >= 16 && hour <= 18 ? 'evening' : 'other';
+                });
+                const temporalPattern = timeSlots.reduce((acc, slot) => {
+                    acc[slot] = (acc[slot] || 0) + 1;
+                    return acc;
+                }, {});
+                
+                // Find the closest landmark (always, even if not within radius)
+                let closestLandmark = null;
+                let closestDistance = Infinity;
+                Object.values(campusLandmarks).flat().forEach(landmark => {
+                    const distance = getDistance(lat, lon, landmark.center[0], landmark.center[1]);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestLandmark = landmark;
+                    }
+                });
+                let locationPhrase = '';
+                if (closestLandmark) {
+                    if (closestDistance <= (closestLandmark.radius || 50)) {
+                        locationPhrase = `at ${closestLandmark.name}`;
+                    } else if (closestDistance < 100) {
+                        locationPhrase = `just outside ${closestLandmark.name}`;
+                    } else {
+                        locationPhrase = `near ${closestLandmark.name}`;
+                    }
+                } else {
+                    locationPhrase = 'somewhere on campus';
+                }
+
+                return {
+                    id,
+                    totalPoints,
+                    avgInstability,
+                    dominantBehavior,
+                    aggressiveCount,
+                    severity,
+                    temporalPattern,
+                    locationPhrase,
+                    landmarkType: closestLandmark ? closestLandmark.type : 'unknown',
+                    landmarkName: closestLandmark ? closestLandmark.name : ''
+                };
+            });
+            
+            // Sort by severity and take top 3
+            clusterAnalysis.sort((a, b) => b.severity - a.severity);
+            const topAreas = clusterAnalysis.slice(0, 3);
+            
+            // --- Narrative Data Preparation ---
+            const areaNarratives = topAreas.map((area, i) => {
+                const temporalInfo = Object.entries(area.temporalPattern)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([time, count]) => `${count} ${time}`)
+                    .join(', ');
+                return `In the area ${area.locationPhrase}, there were ${area.totalPoints} notable moments, most often described as '${area.dominantBehavior.toLowerCase()}' driving. About ${Math.round(area.aggressiveCount/area.totalPoints*100)}% of these were more aggressive. Most activity happened during ${temporalInfo.replace(/,/g, ' and ')}.`;
+            });
+
+            // --- Narrative Prompt ---
+            const prompt = `You are a campus transportation observer writing a 200-word, single-paragraph, narrative summary for Georgia Tech officials. Your job is to describe the overall driving patterns on campus, referencing real campus places (never say 'unknown' or 'hotspot').
+
+Write in smooth, natural, everyday language. Do not use lists, bullet points, or headings. Do not use technical terms like 'cluster', 'hotspot', 'event', or 'instability'. Instead, tell a story about what the driving is like in different parts of campus, always relating each area to a real Georgia Tech landmark. If an area is not exactly at a landmark, say it is 'near' or 'just outside' the closest known place. Make the report sound like a campus observer, not a chatbot. The text should be plain, with no formatting or special characters.
+
+Here are the key observations to weave into your story:
+${areaNarratives.join('\n')}
+
+Begin your narrative now:
+`;
+
+            const response = await fetch('/api/generate-summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate summary');
+            }
+
+            const data = await response.json();
+            const summary = data.choices[0].message.content;
+            
+            // Display the summary as plain text (no HTML formatting)
+            summaryText.textContent = summary;
+        } catch (error) {
+            console.error('Error generating summary:', error);
+            summaryText.innerHTML = `
+                <div style="color: #d7191c; padding: 10px; background-color: #f8d7da; border-radius: 4px;">
+                    <p>Failed to generate summary. Please try again later.</p>
+                    <p style="font-size: 0.9em;">Error: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    attachQueryHandlers();
+
+    // ============================================================================
+    // BENCHMARK SYSTEM FOR CLUSTER VS RAW MODE COMPARISON
+    // ============================================================================
+    
+    const benchmarkQuestions = [
+        {
+            id: "aggressive-driving",
+            question: "Tell me about aggressive driving behaviors around campus",
+            groundTruth: "Should identify Klaus and Student Center as hotspots, mention hard braking or rapid acceleration"
+        },
+        {
+            id: "dwell-time",
+            question: "Which parts of campus have the highest dwell time associated with them",
+            groundTruth: "Should mention long pauses near Student Center, CRC, or Klaus with durations over 2 minutes"
+        },
+        {
+            id: "moderate-behavior",
+            question: "How many instances of moderate driving behavior can be found on campus",
+            groundTruth: "Should provide a numeric count of 'Moderate' behavior events from the dataset"
+        },
+        {
+            id: "route-efficiency",
+            question: "How efficient was the bus route",
+            groundTruth: "Should mention efficiency ratio and compare traveled distance to straight-line distance"
+        },
+        {
+            id: "tech-square-patterns",
+            question: "What are the driving patterns like around Tech Square",
+            groundTruth: "Should reference Tech Square and describe behavior types (moderate, aggressive) found there"
+        }
+    ];
+
+    class ContextModeEvaluator {
+        constructor(questions, runsPerQuestion = 1) {
+            this.benchmarks = questions;
+            this.runsPerQuestion = runsPerQuestion;
+            this.results = [];
+            this.rawRunData = []; // Store all individual runs for statistical analysis
+        }
+
+        estimateTokens(text) {
+            if (!text) return 0;
+            return Math.ceil(text.length / 4);
+        }
+
+        calculateCost(promptTokens, responseTokens) {
+            // Llama 3.1 8B pricing (via Groq/Vercel AI Gateway):
+            // Input: $0.05 per 1M tokens (20M tokens = $1)
+            // Output: $0.08 per 1M tokens (approximately 13M tokens = $1)
+            const promptCost = (promptTokens / 1_000_000) * 0.05;
+            const responseCost = (responseTokens / 1_000_000) * 0.08;
+            return promptCost + responseCost;
+        }
+
+        calculateStats(values) {
+            if (values.length === 0) return { mean: 0, stdDev: 0, min: 0, max: 0 };
+            
+            const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+            const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+            const stdDev = Math.sqrt(variance);
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            
+            return { mean, stdDev, min, max };
+        }
+
+        async testMode(benchmark, mode) {
+            console.log(`   Testing '${mode}' mode for: "${benchmark.question}"`);
+            const wallClockStartTime = performance.now();
+            
+            try {
+                const result = await processUserQuery(benchmark.question, mode);
+                const wallClockEndTime = performance.now();
+
+                const wallClockLatencyMs = wallClockEndTime - wallClockStartTime;
+                
+                // For raw mode, use pure API latency (excluding artificial delays)
+                // For cluster mode, use wall-clock time (no artificial delays)
+                const pureLatencyMs = result.pureApiLatencyMs || wallClockLatencyMs;
+                
+                // Use actual tokens from API response, fallback to estimates if not available
+                let promptTokens, responseTokens;
+                if (result.actualTokens) {
+                    promptTokens = result.actualTokens.promptTokens;
+                    responseTokens = result.actualTokens.completionTokens;
+                } else {
+                    // Fallback to estimates (shouldn't happen with updated code)
+                    promptTokens = this.estimateTokens(result.dataSummary);
+                    responseTokens = this.estimateTokens(result.response);
+                    console.warn(`⚠️ No actual token data available for ${mode} mode, using estimates`);
+                }
+                
+                const totalTokens = promptTokens + responseTokens;
+                const totalCost = this.calculateCost(promptTokens, responseTokens);
+
+                // Log token summary for this mode
+                if (mode === 'raw' && result.pureApiLatencyMs) {
+                    console.log(`   💰 Cost: $${totalCost.toFixed(6)} | Pure API latency: ${(pureLatencyMs / 1000).toFixed(2)}s | Wall-clock: ${(wallClockLatencyMs / 1000).toFixed(2)}s\n`);
+                } else {
+                    console.log(`   💰 Cost: $${totalCost.toFixed(6)} | Latency: ${(pureLatencyMs / 1000).toFixed(2)}s\n`);
+                }
+
+                return {
+                    latencyMs: pureLatencyMs,  // Use pure API latency for fair comparison
+                    latencySec: (pureLatencyMs / 1000).toFixed(2),
+                    wallClockLatencyMs: wallClockLatencyMs,  // Keep wall-clock for reference
+                    promptTokens,
+                    responseTokens,
+                    totalTokens,
+                    costUSD: totalCost,
+                    response: result.response,
+                    dataSummary: result.dataSummary,
+                    category: result.category,
+                    groundTruth: benchmark.groundTruth,
+                    error: null
+                };
+            } catch (error) {
+                const endTime = performance.now();
+                console.error(`Error in '${mode}' mode for "${benchmark.question}":`, error);
+                return {
+                    latencyMs: endTime - startTime,
+                    latencySec: ((endTime - startTime) / 1000).toFixed(2),
+                    error: error.message,
+                    groundTruth: benchmark.groundTruth
+                };
+            }
+        }
+
+        async run() {
+            console.log("🚀 Starting Context Mode Benchmark Evaluation");
+            console.log(`📊 Testing ${this.benchmarks.length} questions in both modes`);
+            console.log(`🔁 Running ${this.runsPerQuestion} iterations per question\n`);
+            
+            const allResults = [];
+            
+            for (let i = 0; i < this.benchmarks.length; i++) {
+                const benchmark = this.benchmarks[i];
+                console.log(`\n[${i + 1}/${this.benchmarks.length}] "${benchmark.question}"`);
+                
+                // Arrays to collect multiple runs for each mode
+                const clusterRuns = [];
+                const rawRuns = [];
+                
+                // Run multiple iterations
+                for (let run = 1; run <= this.runsPerQuestion; run++) {
+                    console.log(`  Run ${run}/${this.runsPerQuestion}...`);
+                    
+                    const clusterResult = await this.testMode(benchmark, 'cluster', run);
+                    clusterRuns.push(clusterResult);
+                    
+                    // Reset rate limit timer between modes to ensure clean slate
+                    resetRateLimitTimer();
+                    console.log(`⏳ Waiting 60 seconds before raw mode to clear rate limits...`);
+                    await new Promise(resolve => setTimeout(resolve, 60000));
+                    
+                    const rawResult = await this.testMode(benchmark, 'raw', run);
+                    rawRuns.push(rawResult);
+                    
+                    // Store individual runs for detailed analysis
+                    this.rawRunData.push({
+                        questionId: benchmark.id,
+                        question: benchmark.question,
+                        run: run,
+                        cluster: clusterResult,
+                        raw: rawResult,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Brief pause between runs
+                    if (run < this.runsPerQuestion) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                }
+                
+                // Calculate statistics across all runs
+                const clusterStats = this.calculateRunStatistics(clusterRuns);
+                const rawStats = this.calculateRunStatistics(rawRuns);
+                
+                allResults.push({
+                    questionId: benchmark.id,
+                    question: benchmark.question,
+                    groundTruth: benchmark.groundTruth,
+                    cluster: clusterStats,
+                    raw: rawStats,
+                    runsPerQuestion: this.runsPerQuestion,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Pause between questions to avoid overwhelming the API
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            this.results = allResults;
+            return allResults;
+        }
+
+        calculateRunStatistics(runs) {
+            const successful = runs.filter(r => !r.error);
+            
+            if (successful.length === 0) {
+                return {
+                    runs: runs.length,
+                    successCount: 0,
+                    errors: runs.map(r => r.error).filter(Boolean),
+                    latency: { mean: 0, stdDev: 0, min: 0, max: 0 },
+                    wallClock: { mean: 0, stdDev: 0, min: 0, max: 0 },
+                    promptTokens: { mean: 0, stdDev: 0, min: 0, max: 0 },
+                    responseTokens: { mean: 0, stdDev: 0, min: 0, max: 0 },
+                    totalTokens: { mean: 0, stdDev: 0, min: 0, max: 0 },
+                    cost: { mean: 0, stdDev: 0, min: 0, max: 0 }
+                };
+            }
+            
+            // Extract values for statistics
+            const latencies = successful.map(r => r.latencyMs / 1000); // Pure API time in seconds
+            const wallClockLatencies = successful.map(r => (r.wallClockLatencyMs || r.latencyMs) / 1000); // Wall-clock time in seconds
+            const promptTokens = successful.map(r => r.promptTokens);
+            const responseTokens = successful.map(r => r.responseTokens);
+            const totalTokens = successful.map(r => r.totalTokens);
+            const costs = successful.map(r => r.costUSD);
+            
+            // Get a representative response (from first successful run)
+            const representativeResponse = successful[0].response;
+            const representativeDataSummary = successful[0].dataSummary;
+            const groundTruth = successful[0].groundTruth;
+            
+            return {
+                runs: runs.length,
+                successCount: successful.length,
+                errors: runs.filter(r => r.error).map(r => r.error),
+                latency: this.calculateStats(latencies),  // Pure API latency (fair comparison metric)
+                wallClock: this.calculateStats(wallClockLatencies),  // Total elapsed time (operational metric)
+                promptTokens: this.calculateStats(promptTokens),
+                responseTokens: this.calculateStats(responseTokens),
+                totalTokens: this.calculateStats(totalTokens),
+                cost: this.calculateStats(costs),
+                representativeResponse,
+                representativeDataSummary,
+                groundTruth
+            };
+        }
+
+        displayResultsSummary() {
+            console.log("\n" + "=".repeat(80));
+            console.log("📈 BENCHMARK RESULTS SUMMARY");
+            console.log(`Runs per question: ${this.runsPerQuestion}`);
+            console.log("=".repeat(80) + "\n");
+
+            // Create comparison table with mean ± stdDev
+            const tableData = this.results.flatMap(r => [
+                {
+                    Question: r.question.substring(0, 40) + "...",
+                    Mode: 'Cluster',
+                    'Latency (s)': r.cluster.successCount > 0 
+                        ? `${r.cluster.latency.mean.toFixed(2)} ± ${r.cluster.latency.stdDev.toFixed(2)}`
+                        : 'FAIL',
+                    'Cost ($)': r.cluster.successCount > 0
+                        ? `${r.cluster.cost.mean.toFixed(6)} ± ${r.cluster.cost.stdDev.toFixed(6)}`
+                        : 'N/A',
+                    'Prompt Tokens': r.cluster.successCount > 0
+                        ? `${r.cluster.promptTokens.mean.toFixed(0)} ± ${r.cluster.promptTokens.stdDev.toFixed(0)}`
+                        : 'N/A',
+                    'Response Tokens': r.cluster.successCount > 0
+                        ? `${r.cluster.responseTokens.mean.toFixed(0)} ± ${r.cluster.responseTokens.stdDev.toFixed(0)}`
+                        : 'N/A',
+                    'Runs': `${r.cluster.successCount}/${r.cluster.runs}`
+                },
+                {
+                    Question: '',
+                    Mode: 'Raw',
+                    'Latency (s)': r.raw.successCount > 0
+                        ? `${r.raw.latency.mean.toFixed(2)} ± ${r.raw.latency.stdDev.toFixed(2)}`
+                        : 'FAIL',
+                    'Cost ($)': r.raw.successCount > 0
+                        ? `${r.raw.cost.mean.toFixed(6)} ± ${r.raw.cost.stdDev.toFixed(6)}`
+                        : 'N/A',
+                    'Prompt Tokens': r.raw.successCount > 0
+                        ? `${r.raw.promptTokens.mean.toFixed(2)} ± ${r.raw.promptTokens.stdDev.toFixed(2)}`
+                        : 'N/A',
+                    'Response Tokens': r.raw.successCount > 0
+                        ? `${r.raw.responseTokens.mean.toFixed(2)} ± ${r.raw.responseTokens.stdDev.toFixed(2)}`
+                        : 'N/A',
+                    'Runs': `${r.raw.successCount}/${r.raw.runs}`
+                }
+            ]);
+
+            console.table(tableData);
+
+            // Calculate aggregates across all questions
+            const clusterStats = this.calculateOverallAggregates(this.results.map(r => r.cluster));
+            const rawStats = this.calculateOverallAggregates(this.results.map(r => r.raw));
+
+            console.log("\n📊 OVERALL AGGREGATE STATISTICS");
+            console.log("-".repeat(80));
+            console.log("Cluster Mode:");
+            console.log(`  Avg Latency: ${clusterStats.avgLatency.mean.toFixed(2)}s ± ${clusterStats.avgLatency.stdDev.toFixed(2)}s`);
+            console.log(`  Avg Cost: $${clusterStats.avgCost.mean.toFixed(6)} ± $${clusterStats.avgCost.stdDev.toFixed(6)}`);
+            console.log(`  Avg Total Tokens: ${clusterStats.avgTokens.mean.toFixed(0)} ± ${clusterStats.avgTokens.stdDev.toFixed(0)}`);
+            console.log(`  Success Rate: ${clusterStats.successRate}%`);
+            
+            console.log("\nRaw Mode:");
+            console.log(`  Avg Latency: ${rawStats.avgLatency.mean.toFixed(2)}s ± ${rawStats.avgLatency.stdDev.toFixed(2)}s`);
+            console.log(`  Avg Cost: $${rawStats.avgCost.mean.toFixed(6)} ± $${rawStats.avgCost.stdDev.toFixed(6)}`);
+            console.log(`  Avg Total Tokens: ${rawStats.avgTokens.mean.toFixed(0)} ± ${rawStats.avgTokens.stdDev.toFixed(0)}`);
+            console.log(`  Success Rate: ${rawStats.successRate}%`);
+
+            console.log("\n" + "=".repeat(80));
+        }
+
+        calculateOverallAggregates(results) {
+            const successful = results.filter(r => r.successCount > 0);
+            const successCount = successful.reduce((sum, r) => sum + r.successCount, 0);
+            const totalCount = results.reduce((sum, r) => sum + r.runs, 0);
+
+            if (successCount === 0) {
+                return {
+                    avgLatency: { mean: 0, stdDev: 0 },
+                    avgCost: { mean: 0, stdDev: 0 },
+                    avgTokens: { mean: 0, stdDev: 0 },
+                    successRate: 0
+                };
+            }
+
+            // Extract all means from each question's statistics
+            const latencyMeans = successful.map(r => r.latency.mean);
+            const costMeans = successful.map(r => r.cost.mean);
+            const tokenMeans = successful.map(r => r.totalTokens.mean);
+
+            // Calculate statistics of the means
+            const avgLatency = this.calculateStats(latencyMeans);
+            const avgCost = this.calculateStats(costMeans);
+            const avgTokens = this.calculateStats(tokenMeans);
+            const successRate = ((successCount / totalCount) * 100).toFixed(1);
+
+            return { avgLatency, avgCost, avgTokens, successRate };
+        }
+
+        displayDetailedResponses() {
+            console.log("\n" + "=".repeat(80));
+            console.log("📝 DETAILED RESPONSES FOR MANUAL ACCURACY REVIEW");
+            console.log(`Runs per question: ${this.runsPerQuestion}`);
+            console.log("=".repeat(80));
+
+            this.results.forEach((r, i) => {
+                console.log(`\n${"─".repeat(80)}`);
+                console.log(`Question ${i + 1}: ${r.question}`);
+                console.log(`Ground Truth: ${r.groundTruth}`);
+                console.log(`Successful runs: Cluster ${r.cluster.successCount}/${r.cluster.runs}, Raw ${r.raw.successCount}/${r.raw.runs}`);
+                console.log(`${"─".repeat(80)}`);
+                
+                console.log("\n[CLUSTER MODE RESPONSE (Representative)]");
+                console.log(r.cluster.representativeResponse || `ERROR: ${r.cluster.errors.join(', ')}`);
+                
+                console.log("\n[RAW MODE RESPONSE (Representative)]");
+                console.log(r.raw.representativeResponse || `ERROR: ${r.raw.errors.join(', ')}`);
+                
+                console.log("\n");
+            });
+        }
+
+        exportToJSON() {
+            const exportData = {
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    totalQuestions: this.benchmarks.length,
+                    runsPerQuestion: this.runsPerQuestion,
+                    datasetSize: allData.length
+                },
+                aggregatedResults: this.results,
+                rawRunData: this.rawRunData
+            };
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            console.log("\n📦 Benchmark Results (JSON):");
+            console.log("Copy the object below to save your results:\n");
+            console.log(dataStr);
+            
+            // Also save to localStorage
+            try {
+                localStorage.setItem('benchmarkResults', dataStr);
+                localStorage.setItem('benchmarkResults_timestamp', new Date().toISOString());
+                console.log("\n✅ Results also saved to localStorage under key 'benchmarkResults'");
+            } catch (e) {
+                console.warn("⚠️ Could not save to localStorage:", e.message);
+            }
+
+            return exportData;
+        }
+
+        exportToCSV() {
+            // CSV with aggregated statistics (mean ± stdDev)
+            let csv = "Question ID,Question,Mode,Runs,Success Rate,Latency Mean (s),Latency StdDev (s),Wall-Clock Mean (s),Wall-Clock StdDev (s),Prompt Tokens Mean,Prompt Tokens StdDev,Response Tokens Mean,Response Tokens StdDev,Total Tokens Mean,Total Tokens StdDev,Cost Mean ($),Cost StdDev ($)\n";
+            
+            this.results.forEach(r => {
+                // Cluster row (latency = wall-clock for cluster mode)
+                csv += `${r.questionId},"${r.question.replace(/"/g, '""')}",cluster,`;
+                csv += `${r.cluster.runs},`;
+                csv += `${((r.cluster.successCount / r.cluster.runs) * 100).toFixed(1)}%,`;
+                csv += `${r.cluster.latency.mean.toFixed(4)},`;
+                csv += `${r.cluster.latency.stdDev.toFixed(4)},`;
+                csv += `${r.cluster.wallClock ? r.cluster.wallClock.mean.toFixed(4) : r.cluster.latency.mean.toFixed(4)},`;
+                csv += `${r.cluster.wallClock ? r.cluster.wallClock.stdDev.toFixed(4) : r.cluster.latency.stdDev.toFixed(4)},`;
+                csv += `${r.cluster.promptTokens.mean.toFixed(2)},`;
+                csv += `${r.cluster.promptTokens.stdDev.toFixed(2)},`;
+                csv += `${r.cluster.responseTokens.mean.toFixed(2)},`;
+                csv += `${r.cluster.responseTokens.stdDev.toFixed(2)},`;
+                csv += `${r.cluster.totalTokens.mean.toFixed(2)},`;
+                csv += `${r.cluster.totalTokens.stdDev.toFixed(2)},`;
+                csv += `${r.cluster.cost.mean.toFixed(8)},`;
+                csv += `${r.cluster.cost.stdDev.toFixed(8)}\n`;
+                
+                // Raw row (latency = pure API time, wall-clock = total with delays)
+                csv += `${r.questionId},"${r.question.replace(/"/g, '""')}",raw,`;
+                csv += `${r.raw.runs},`;
+                csv += `${((r.raw.successCount / r.raw.runs) * 100).toFixed(1)}%,`;
+                csv += `${r.raw.latency.mean.toFixed(4)},`;
+                csv += `${r.raw.latency.stdDev.toFixed(4)},`;
+                csv += `${r.raw.wallClock ? r.raw.wallClock.mean.toFixed(4) : r.raw.latency.mean.toFixed(4)},`;
+                csv += `${r.raw.wallClock ? r.raw.wallClock.stdDev.toFixed(4) : r.raw.latency.stdDev.toFixed(4)},`;
+                csv += `${r.raw.promptTokens.mean.toFixed(2)},`;
+                csv += `${r.raw.promptTokens.stdDev.toFixed(2)},`;
+                csv += `${r.raw.responseTokens.mean.toFixed(2)},`;
+                csv += `${r.raw.responseTokens.stdDev.toFixed(2)},`;
+                csv += `${r.raw.totalTokens.mean.toFixed(2)},`;
+                csv += `${r.raw.totalTokens.stdDev.toFixed(2)},`;
+                csv += `${r.raw.cost.mean.toFixed(8)},`;
+                csv += `${r.raw.cost.stdDev.toFixed(8)}\n`;
+            });
+
+            console.log("\n📊 Aggregated CSV Export (Mean ± StdDev):");
+            console.log(csv);
+
+            // Create downloadable file for aggregated results
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `benchmark_aggregated_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Also export raw individual runs
+            this.exportRawRunsCSV();
+            
+            console.log("✅ CSV files downloaded (aggregated + raw runs)");
+            
+            return csv;
+        }
+
+        exportRawRunsCSV() {
+            // CSV with individual run data
+            let csv = "Question ID,Question,Run,Mode,Latency (s),Wall-Clock (s),Prompt Tokens,Response Tokens,Total Tokens,Cost ($),Error\n";
+            
+            this.rawRunData.forEach(run => {
+                // Cluster run (latency = wall-clock for cluster)
+                csv += `${run.questionId},"${run.question.replace(/"/g, '""')}",${run.run},cluster,`;
+                csv += `${(run.cluster.latencyMs / 1000).toFixed(4)},`;
+                csv += `${((run.cluster.wallClockLatencyMs || run.cluster.latencyMs) / 1000).toFixed(4)},`;
+                csv += `${run.cluster.promptTokens || ''},`;
+                csv += `${run.cluster.responseTokens || ''},`;
+                csv += `${run.cluster.totalTokens || ''},`;
+                csv += `${run.cluster.costUSD?.toFixed(8) || ''},`;
+                csv += `"${run.cluster.error || ''}"\n`;
+                
+                // Raw run (latency = pure API, wall-clock = with delays)
+                csv += `${run.questionId},"${run.question.replace(/"/g, '""')}",${run.run},raw,`;
+                csv += `${(run.raw.latencyMs / 1000).toFixed(4)},`;
+                csv += `${((run.raw.wallClockLatencyMs || run.raw.latencyMs) / 1000).toFixed(4)},`;
+                csv += `${run.raw.promptTokens || ''},`;
+                csv += `${run.raw.responseTokens || ''},`;
+                csv += `${run.raw.totalTokens || ''},`;
+                csv += `${run.raw.costUSD?.toFixed(8) || ''},`;
+                csv += `"${run.raw.error || ''}"\n`;
+            });
+
+            // Create downloadable file for raw runs
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `benchmark_raw_runs_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+
+    // Global function to run the benchmark
+    window.runBenchmark = async function(runsPerQuestion = 1) {
+        if (!allData || allData.length === 0) {
+            console.error("❌ No data loaded. Please wait for the map to load data first.");
+            return;
+        }
+
+        console.clear();
+        const evaluator = new ContextModeEvaluator(benchmarkQuestions, runsPerQuestion);
+        
+        try {
+            await evaluator.run();
+            evaluator.displayResultsSummary();
+            evaluator.displayDetailedResponses();
+            
+            // Export results
+            const jsonData = evaluator.exportToJSON();
+            evaluator.exportToCSV();
+            
+            console.log("\n" + "=".repeat(80));
+            console.log("✅ BENCHMARK COMPLETE!");
+            console.log("=".repeat(80));
+            console.log(`📊 Statistics collected: ${runsPerQuestion} iteration(s) per question`);
+            console.log(`📝 Questions tested: ${evaluator.benchmarks.length}`);
+            console.log(`🔄 Total test runs: ${evaluator.benchmarks.length * runsPerQuestion * 2} (cluster + raw)`);
+            console.log("\n� OUTPUT FILES DOWNLOADED:");
+            console.log("   1️⃣  benchmark_aggregated_YYYY-MM-DD.csv");
+            console.log("      - Contains: Mean ± Standard Deviation for each metric");
+            console.log("      - Columns: Latency Mean/StdDev, Token Mean/StdDev, Cost Mean/StdDev");
+            console.log("      - Use for: Publication tables, summary statistics");
+            console.log("\n   2️⃣  benchmark_raw_runs_YYYY-MM-DD.csv");
+            console.log("      - Contains: Individual values from each run");
+            console.log("      - Use for: Variance analysis, outlier detection, detailed plotting");
+            console.log("\n💾 Data also saved to browser localStorage");
+            console.log("   Retrieve with: JSON.parse(localStorage.getItem('benchmarkResults'))");
+            console.log("\n� NEXT STEPS:");
+            console.log("   1. Review detailed responses above for accuracy evaluation");
+            console.log("   2. Import CSV files into Excel/Python/R for statistical analysis");
+            console.log("   3. Calculate confidence intervals (if needed): CI = mean ± (t * stdDev/√n)");
+            console.log("   4. Create visualizations with error bars using mean ± stdDev");
+            console.log("=".repeat(80) + "\n");
+            
+            return jsonData;
+        } catch (error) {
+            console.error("❌ Benchmark failed:", error);
+            throw error;
+        }
+    };
+
+    // Expose utility functions for manual rate limit management
+    window.resetRateLimitTimer = resetRateLimitTimer;
+
+    // Diagnostic function to test API connectivity and rate limits
+    window.testAPIConnection = async function() {
+        console.log("🔍 Testing API Connection...\n");
+        
+        const testPrompt = "Reply with just the word 'OK'";
+        const startTime = performance.now();
+        
+        try {
+            const response = await fetch('/api/generate-summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: testPrompt })
+            });
+            
+            const endTime = performance.now();
+            const latency = ((endTime - startTime) / 1000).toFixed(2);
+            
+            console.log(`⏱️ Latency: ${latency}s`);
+            console.log(`📊 Status: ${response.status} ${response.statusText}`);
+            
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                console.error(`❌ Rate limit hit!`);
+                if (retryAfter) {
+                    console.log(`⏰ Retry after: ${retryAfter} seconds`);
+                }
+                console.log(`\n💡 SOLUTION: Wait a moment before making more requests.`);
+                return { status: 'rate_limited', retryAfter };
+            }
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`❌ API Error: ${errorText}`);
+                return { status: 'error', message: errorText };
+            }
+            
+            const data = await response.json();
+            console.log(`✅ API is working!`);
+            console.log(`📝 Response:`, data?.choices?.[0]?.message?.content);
+            
+            return { status: 'ok', latency };
+        } catch (error) {
+            console.error(`❌ Connection failed:`, error.message);
+            return { status: 'error', message: error.message };
+        }
+    };
+
+    // Diagnostic function to estimate raw mode API calls
+    window.estimateRawModeCalls = function() {
+        if (!allData || allData.length === 0) {
+            console.error("❌ No data loaded yet.");
+            return;
+        }
+
+        const { chunks, truncated, processedCount } = splitFeaturesForRawMode(allData);
+        
+        console.log("📊 Raw Mode API Call Estimation:");
+        console.log(`   Dataset size: ${allData.length} records`);
+        console.log(`   Chunks needed: ${chunks.length}`);
+        console.log(`   Records processed: ${processedCount}`);
+        console.log(`   Truncated: ${truncated ? 'Yes' : 'No'}`);
+        console.log(`   Total API calls: ${chunks.length + 1} (${chunks.length} chunks + 1 synthesis)`);
+        
+        // Calculate estimated time with 12-15s spacing
+        const chunkDelayTime = (chunks.length - 1) * (RATE_LIMIT_CONFIG.CHUNK_DELAY_MS / 1000);
+        const finalDelayTime = RATE_LIMIT_CONFIG.FINAL_DELAY_MS / 1000;
+        const minSpacingTime = (chunks.length + 1) * (RATE_LIMIT_CONFIG.MIN_REQUEST_SPACING_MS / 1000);
+        const totalEstimatedTime = chunkDelayTime + finalDelayTime + minSpacingTime;
+        
+        const minutes = Math.floor(totalEstimatedTime / 60);
+        const seconds = Math.floor(totalEstimatedTime % 60);
+        
+        console.log(`   Estimated time: ~${totalEstimatedTime.toFixed(0)}s (${minutes}m ${seconds}s)`);
+        console.log(`   ⏱️  Using 60s spacing between all calls (conservative for TPM limits)`);
+        console.log(`   Breakdown: ${chunkDelayTime}s between chunks + ${finalDelayTime}s before synthesis + ${minSpacingTime.toFixed(0)}s min spacing`);
+        
+        chunks.forEach((chunk, i) => {
+            console.log(`   Chunk ${i + 1}: records ${chunk.startIndex + 1}-${chunk.endIndex + 1}, ~${chunk.estimatedTokens.toFixed(0)} tokens`);
+        });
+        
+        return {
+            totalCalls: chunks.length + 1,
+            chunks: chunks.length,
+            estimatedTimeSeconds: totalEstimatedTime,
+            estimatedTimeFormatted: `${minutes}m ${seconds}s`
+        };
+    };
+
+    // Function to adjust rate limit settings
+    window.configureRateLimits = function(options = {}) {
+        console.log("⚙️ Current Rate Limit Configuration:");
+        console.log(JSON.stringify(RATE_LIMIT_CONFIG, null, 2));
+        console.log("\n📊 Configuration Notes:");
+        console.log("   • 60s delay: Required to avoid 429 errors (TPM accumulation)");
+        console.log("   • 5 max chunks: Random sampling for fast, stochastic responses");
+        console.log("   • Random sampling: Chunks distributed across full dataset");
+        
+        if (Object.keys(options).length === 0) {
+            console.log("\n⚠️  WARNING: Conservative settings to avoid rate limits.");
+            console.log("   Tested with Llama-3.1-8b-instant (30 RPM, 6K TPM)");
+            console.log("💡 Only modify if using a different model or need different coverage.");
+            console.log("\nTo modify: configureRateLimits({ MAX_CHUNKS: 10, CHUNK_DELAY_MS: 45000 })");
+            console.log("\nAvailable settings:");
+            console.log(`  CHUNK_DELAY_MS: delay between chunks (current: ${RATE_LIMIT_CONFIG.CHUNK_DELAY_MS}ms = ${RATE_LIMIT_CONFIG.CHUNK_DELAY_MS/1000}s)`);
+            console.log(`  FINAL_DELAY_MS: delay before final synthesis (current: ${RATE_LIMIT_CONFIG.FINAL_DELAY_MS}ms = ${RATE_LIMIT_CONFIG.FINAL_DELAY_MS/1000}s)`);
+            console.log(`  MAX_RETRIES: retry attempts on failure (current: ${RATE_LIMIT_CONFIG.MAX_RETRIES})`);
+            console.log(`  RETRY_BASE_DELAY_MS: base retry delay (current: ${RATE_LIMIT_CONFIG.RETRY_BASE_DELAY_MS}ms = ${RATE_LIMIT_CONFIG.RETRY_BASE_DELAY_MS/1000}s)`);
+            console.log(`  MAX_CHUNKS: max chunks to process (current: ${RATE_LIMIT_CONFIG.MAX_CHUNKS})`);
+            console.log(`  MIN_REQUEST_SPACING_MS: min time between any requests (current: ${RATE_LIMIT_CONFIG.MIN_REQUEST_SPACING_MS}ms = ${RATE_LIMIT_CONFIG.MIN_REQUEST_SPACING_MS/1000}s)`);
+            return RATE_LIMIT_CONFIG;
+        }
+        
+        // Update settings
+        Object.keys(options).forEach(key => {
+            if (RATE_LIMIT_CONFIG.hasOwnProperty(key)) {
+                const oldValue = RATE_LIMIT_CONFIG[key];
+                RATE_LIMIT_CONFIG[key] = options[key];
+                console.log(`✅ Updated ${key}: ${oldValue}ms → ${options[key]}ms`);
+            } else {
+                console.warn(`⚠️ Unknown setting: ${key}`);
+            }
+        });
+        
+        console.log("\n✅ New configuration:");
+        console.log(JSON.stringify(RATE_LIMIT_CONFIG, null, 2));
+        
+        return RATE_LIMIT_CONFIG;
+    };
+
+    // Add benchmark questions to window for easy access
+    window.benchmarkQuestions = benchmarkQuestions;
+    
+    // Function to check dataset coverage in raw mode
+    window.checkDataCoverage = function() {
+        if (!allData || allData.length === 0) {
+            console.error("❌ No data loaded yet. Wait for map to load data.");
+            return;
+        }
+
+        const { chunks, truncated, processedCount } = splitFeaturesForRawMode(allData);
+        
+        console.log("\n" + "=".repeat(80));
+        console.log("📊 RAW MODE DATASET COVERAGE ANALYSIS");
+        console.log("=".repeat(80));
+        console.log(`Total records in dataset: ${allData.length}`);
+        console.log(`Records that will be processed: ${processedCount}`);
+        console.log(`Coverage: ${((processedCount / allData.length) * 100).toFixed(1)}%`);
+        console.log(`Number of chunks: ${chunks.length}`);
+        console.log(`Max allowed chunks: ${RATE_LIMIT_CONFIG.MAX_CHUNKS}`);
+        console.log(`Truncated: ${truncated ? '⚠️  YES - some data will be skipped' : '✅ NO - full dataset will be analyzed'}`);
+        
+        if (truncated) {
+            const skipped = allData.length - processedCount;
+            const avgRecordsPerChunk = processedCount / chunks.length;
+            const chunksNeeded = Math.ceil(allData.length / avgRecordsPerChunk);
+            
+            console.log("\n" + "─".repeat(80));
+            console.warn(`⚠️  WARNING: ${skipped} records (${((skipped / allData.length) * 100).toFixed(1)}%) will be SKIPPED!`);
+            console.log("\n💡 OPTIONS TO ANALYZE FULL DATASET:");
+            console.log(`   Option 1: Increase MAX_CHUNKS to ${chunksNeeded}`);
+            console.log(`      Command: configureRateLimits({ MAX_CHUNKS: ${chunksNeeded} })`);
+            console.log(`      Time: ~${Math.ceil(chunksNeeded * 13 / 60)} minutes per query`);
+            console.log(`   Option 2: Use cluster mode instead (always processes 100% of data in 1-2 seconds)`);
+            console.log("─".repeat(80));
+        } else {
+            console.log("\n✅ FULL DATASET COVERAGE");
+            const estimatedTime = estimateRawModeCalls();
+            console.log(`   All ${allData.length} records will be analyzed`);
+            console.log(`   Estimated time per query: ${estimatedTime.estimatedTimeFormatted}`);
+        }
+        console.log("=".repeat(80) + "\n");
+        
+        return {
+            totalRecords: allData.length,
+            processedRecords: processedCount,
+            coveragePercent: parseFloat(((processedCount / allData.length) * 100).toFixed(1)),
+            skippedRecords: allData.length - processedCount,
+            truncated,
+            chunks: chunks.length,
+            maxChunks: RATE_LIMIT_CONFIG.MAX_CHUNKS,
+            chunksNeededForFullCoverage: truncated ? Math.ceil(allData.length / (processedCount / chunks.length)) : chunks.length
+        };
+    };
+    
+    console.log("\n" + "=".repeat(80));
+    console.log("🚀 BENCHMARK SYSTEM READY");
+    console.log("=".repeat(80));
+    console.log("\n📋 QUICK START - Run 5-iteration benchmark for publication:");
+    console.log("   runBenchmark(5)");
+    console.log("\n⏱️  Configuration:");
+    console.log("   • Model: llama-3.1-8b-instant (30 RPM, 6K TPM)");
+    console.log("   • Chunk size: 3K tokens (safe TPM budget)");
+    console.log("   • Rate limits: 60s between ALL calls (conservative for TPM)");
+    console.log("   • Max chunks: 5 (random sampling for stochastic responses)");
+    console.log("   • Questions: 5 representative queries");
+    console.log("\n🎯 Benchmark Options:");
+    console.log("   runBenchmark(1)  → Quick test (1 run, ~5-6 min per raw query)");
+    console.log("   runBenchmark(3)  → Standard test (3 runs, ~1.5-2 hrs total)");
+    console.log("   runBenchmark(5)  → Publication quality (5 runs, ~2.5-3 hrs total) ⭐");
+    console.log("\n� Diagnostic Tools:");
+    console.log("   checkDataCoverage()    → Check if raw mode processes full dataset");
+    console.log("   estimateRawModeCalls() → Estimate time for raw mode query");
+    console.log("   testAPIConnection()    → Test API connectivity");
+    console.log("   configureRateLimits()  → View/modify rate limit settings");
+    console.log("\n📊 Output:");
+    console.log("   • 2 CSV files with mean ± standard deviation");
+    console.log("   • Console output with detailed statistics");
+    console.log("   • localStorage backup of all results");
+    console.log("=".repeat(80) + "\n");
+</script>
+
+</body>
+</html>
