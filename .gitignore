@@ -1,0 +1,22 @@
+# API keys and environment variables
+.keys
+.env
+.env.local
+.env.*.local
+
+# Vercel local config
+.vercel/
+
+# Node dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
