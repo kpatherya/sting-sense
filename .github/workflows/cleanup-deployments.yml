@@ -1,0 +1,77 @@
+name: Cleanup old deployments
+
+on:
+  # Run when Vercel/GitHub reports a successful deployment status.
+  deployment_status:
+  # Also run on pushes to the default branch, plus allow manual runs.
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Ensure only one cleanup runs at a time so we don't race with the API.
+concurrency:
+  group: cleanup-deployments
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Delete prior GitHub deployments
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Only act on successful deployment-status events. For push/manual,
+            // skip this gate so cleanup still happens.
+            if (github.event_name === 'deployment_status' && github.event.deployment_status?.state !== 'success') {
+              core.info(`Deployment status is ${github.event.deployment_status?.state || 'unknown'}; skipping cleanup.`);
+              return;
+            }
+
+            // Fetch every deployment for this repo (Vercel creates many of these).
+            const deployments = await github.paginate(
+              github.rest.repos.listDeployments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              }
+            );
+
+            if (deployments.length <= 1) {
+              core.info('Zero or one deployment exists; nothing to clean up.');
+              return;
+            }
+
+            // Sort newest first and keep only the latest deployment.
+            const sorted = deployments.sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+            const [latest, ...older] = sorted;
+
+            core.info(`Keeping deployment ${latest.id} (${latest.environment}). Deleting ${older.length} older deployment(s).`);
+
+            for (const deployment of older) {
+              try {
+                // Deployments must be inactive before they can be deleted (when >1 exist).
+                await github.rest.repos.createDeploymentStatus({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  deployment_id: deployment.id,
+                  state: 'inactive'
+                });
+
+                await github.rest.repos.deleteDeployment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  deployment_id: deployment.id
+                });
+
+                core.info(`Deleted deployment ${deployment.id} (${deployment.environment}).`);
+              } catch (err) {
+                core.warning(`Failed to delete deployment ${deployment.id}: ${err.message}`);
+              }
+            }
