@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
+const Groq = require('groq-sdk');
 const path = require('path');
 
 const app = express();
@@ -11,7 +11,9 @@ app.use(express.static('public'));
 
 const responseCache = new Map();
 
-const getApiKey = () => process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY;
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const getApiKey = () => process.env.GROQ_API_KEY;
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -31,35 +33,17 @@ const validateRequest = (req, res, next) => {
 
 const generateCacheKey = (prompt) => prompt.trim().toLowerCase();
 
-const callOpenRouter = async (prompt, temperature, maxTokens) => {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY (or GROQ_API_KEY for transition) is not defined');
+const callGroq = async (prompt, temperature, maxTokens) => {
+  if (!getApiKey()) {
+    throw new Error('GROQ_API_KEY is not defined');
   }
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'meta-llama/llama-3.1-8b-instruct',
-      messages: [{ role: 'user', content: prompt }],
-      temperature,
-      max_tokens: maxTokens,
-    }),
+  return groq.chat.completions.create({
+    model: 'groq/compound',
+    messages: [{ role: 'user', content: prompt }],
+    temperature,
+    max_tokens: maxTokens,
   });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    const err = new Error('OpenRouter request failed');
-    err.status = response.status;
-    err.payload = errorData;
-    throw err;
-  }
-
-  return response.json();
 };
 
 app.post('/api/generate-summary', validateRequest, async (req, res) => {
@@ -71,21 +55,14 @@ app.post('/api/generate-summary', validateRequest, async (req, res) => {
   }
 
   try {
-    const data = await callOpenRouter(prompt, 0.3, 160);
+    const data = await callGroq(prompt, 0.3, 160);
     responseCache.set(cacheKey, data);
     return res.json(data);
   } catch (error) {
-    if (error.payload) {
-      console.error('OpenRouter API error:', error.payload);
-      return res.status(error.status || 502).json({
-        error: 'Unable to generate response',
-        message: 'Please try again later',
-      });
-    }
-
-    console.error('Error in generate-summary endpoint:', error);
-    return res.status(500).json({
-      error: 'Service temporarily unavailable',
+    const errorPayload = error?.error || error?.message || error;
+    console.error('Groq API error in generate-summary:', errorPayload);
+    return res.status(error?.status || 502).json({
+      error: 'Unable to generate response',
       message: 'Please try again later',
     });
   }
@@ -100,17 +77,13 @@ app.post('/api/generate-insight', validateRequest, async (req, res) => {
   }
 
   try {
-    const data = await callOpenRouter(prompt, 0.5, 150);
+    const data = await callGroq(prompt, 0.5, 150);
     responseCache.set(cacheKey, data);
     return res.json(data);
   } catch (error) {
-    if (error.payload) {
-      console.error('OpenRouter API error on insight generation:', error.payload);
-      return res.status(error.status || 502).json({ error: 'Unable to generate insight' });
-    }
-
-    console.error('Error in generate-insight endpoint:', error);
-    return res.status(500).json({ error: 'Service temporarily unavailable' });
+    const errorPayload = error?.error || error?.message || error;
+    console.error('Groq API error in generate-insight:', errorPayload);
+    return res.status(error?.status || 502).json({ error: 'Unable to generate insight' });
   }
 });
 
