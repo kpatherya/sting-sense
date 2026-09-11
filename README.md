@@ -7,6 +7,29 @@ for route-level exploration.
 
 Project metadata: [CONTRIBUTING.md](CONTRIBUTING.md) · [CITATION.cff](CITATION.cff) · [LICENSE](LICENSE)
 
+**Live demo:** [sting-sense.vercel.app](https://sting-sense.vercel.app/) ·
+**Project page:** [kausarpatherya.com](https://kausarpatherya.com/projects/sting-sense/index.html) ·
+**Write-up:** [MCI bus analytics](https://kausarpatherya.com/2024/12/13/mci-bus-analytics/index.html)
+
+## Where this sits in the larger project
+
+This repository is the **analysis half** of Sting-Sense. The data it consumes is
+collected by companion Zephyr RTOS firmware running on Actinius Icarus
+(nRF9160) boards mounted on Georgia Tech Stinger buses, which samples
+accelerometer and GPS readings and uploads them over LTE:
+
+- Firmware and collection: [kpatherya/bus-rtos](https://github.com/kpatherya/bus-rtos)
+- Analysis and visualization: this repository
+
+The same bus-fleet telemetry is the deployment used to evaluate
+[Flash-Fusion](https://github.com/kpatherya/flash-fusion)
+([arXiv:2511.11885](https://arxiv.org/abs/2511.11885)).
+
+Kausar Patherya built both halves of Sting-Sense while working with
+**Prof. Ashutosh Dhekne** (WiSciTech Lab, Georgia Tech), beginning as a CS 8903
+Special Problems project: the on-device firmware and tiered aggregation
+pipeline, and the route-scoring and mapping analytics in this repository.
+
 ## Repository Layout
 
 - `bus_routes_app.py`: Streamlit app for interactive route/hour filtering.
